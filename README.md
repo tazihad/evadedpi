@@ -109,14 +109,18 @@ Any browser, application, or CLI tool can point to `127.0.0.1:1080` regardless o
 ### 2. TLS ClientHello & SNI Segmentation
 When a client begins a TLS connection, it sends an unencrypted `ClientHello` containing the domain name inside the Server Name Indication (SNI) extension. 
 Stateless and simple stateful DPI boxes inspect this packet to identify blocked domains. EvadeDPI parses the ClientHello structure and splits the packet into multiple TCP segments:
-- **`sni` (default)**: Splits right at the beginning or middle of the SNI domain string. The DPI buffer only sees `[Handshake Header + Ciphers]` in packet 1 and `[SNI String + Remainder]` in packet 2.
+- **`sni` (default)**: Splits right at the beginning of the SNI domain string. The DPI buffer only sees `[Handshake Header + Ciphers]` in packet 1 and `[SNI String + Remainder]` in packet 2.
+- **`mid-sni`**: Splits directly at the midpoint of the SNI domain string (e.g. `yout` in packet 1, `ube.com` in packet 2).
+- **`multisplit`**: Partitions across 3 segments (before SNI, mid-SNI, and remainder).
 - **`first-byte`**: Splits 1 byte into packet 1 and the rest into packet 2.
 - **`chunk`**: Chunks the handshake into $N$-byte segments (e.g. 20 or 40 bytes).
+- **`--split-offsets`**: Dynamically cuts the ClientHello at custom byte offsets relative to the SNI extension (`1+s`, `3+s`, `-5+se`, `+m`, or absolute numbers). Enables micro-chunking across the SNI.
 - **`delay-ms`**: Adds an inter-segment delay (e.g. 2ms) with `TCP_NODELAY` to force the kernel to transmit distinct IP packets.
 
-### 3. TLS Record Layer Fragmentation (`--tlsrec`)
+### 3. TLS Record Layer Fragmentation (`--tlsrec`, `--tlsrec-offset`)
 Under RFC 5246 (TLS 1.2) and RFC 8446 (TLS 1.3), a handshake message **may be partitioned across multiple TLS record headers**.
 EvadeDPI wraps the first portion of the ClientHello into TLS Record 1 and the remainder into TLS Record 2. Destination web servers reassemble the records effortlessly, while DPI hardware fails to detect the SNI because the extension is fragmented across record boundaries.
+- **`--tlsrec-offset <OFFSET>`**: Position the record boundary dynamically relative to the SNI domain (e.g. `--tlsrec-offset "-5+se"`, `1+s`, `mid-sni`, or absolute byte index `2`).
 
 ### 4. Decoy / Fake ClientHello Injection
 For stateful middleboxes (such as Russia's TSPU):
@@ -155,11 +159,11 @@ Pre-compiled, standalone binaries are packaged with high-efficiency `.tar.xz` co
 #### Option A: One-Liner Download & Extract (Linux x86_64)
 
 ```bash
-# Download the latest v0.3.0 release archive
-curl -sLO https://github.com/tazihad/evadedpi/releases/download/v0.3.0/evadedpi-v0.3.0-linux-x86_64.tar.xz
+# Download the latest v0.4.0 release archive
+curl -sLO https://github.com/tazihad/evadedpi/releases/download/v0.4.0/evadedpi-v0.4.0-linux-x86_64.tar.xz
 
 # Extract the archive
-tar -xJf evadedpi-v0.3.0-linux-x86_64.tar.xz
+tar -xJf evadedpi-v0.4.0-linux-x86_64.tar.xz
 
 # (Optional) Install system-wide to /usr/local/bin
 sudo install -m 755 evadedpi /usr/local/bin/
@@ -227,7 +231,7 @@ Output:
  | |____\ V / (_| | (_| |  __/ |__| | |    _| |_ 
  |______|\_/ \__,_|\__,_|\___|_____/|_|   |_____|
 
-   EvadeDPI v0.3.0 by tazihad - Deep Packet Inspection Evasion Suite
+   EvadeDPI v0.4.0 by tazihad - Deep Packet Inspection Evasion Suite
    Written in Rust. Cross-Platform SOCKS5 & HTTP Proxy
 
 ╭─── Active Configuration ─────────────────────────────────────╮
@@ -377,11 +381,13 @@ Options:
       --preset <PRESET>          Evasion preset profile [default: general]
                                  [values: general, first-byte, russia, iran, china, turkey, discord-youtube, extreme]
   -s, --split-mode <SPLIT_MODE>  Splitting mode [default: sni]
-                                 [values: sni, mid-sni, multisplit, first-byte, chunk, random, custom, none]
+                                  [values: sni, mid-sni, multisplit, first-byte, chunk, random, custom, none]
       --chunk-size <BYTES>       Chunk size when split-mode is chunk [default: 40]
+      --split-offsets <OFFSETS>  Custom split offsets, comma-separated (e.g. "1+s,3+s,6+s" or "20,40,60")
+      --tlsrec                   Split ClientHello across TLS record headers
+      --tlsrec-offset <OFFSET>   Split position for TLS record layer (e.g. "sni", "mid-sni", "-5+se", "2")
   -d, --delay-ms <MS>            Delay between segments in ms [default: 2]
       --disorder                 Send packet segments in reverse order
-      --tlsrec                   Split ClientHello across TLS record headers
       --mix-sni                  Randomize SNI character casing to bypass case-sensitive DPI
       --fake                     Enable fake decoy ClientHello injection
       --fake-sni <HOST>          Decoy SNI for fake packet [default: www.microsoft.com]

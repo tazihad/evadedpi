@@ -36,7 +36,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 
 use crate::core::http::HttpEvasionOptions;
-use crate::core::strategy::{EvasionStrategy, SplitMode};
+use crate::core::strategy::{EvasionStrategy, SplitMode, SplitOffset};
 use crate::dns::DohProvider;
 use crate::rules::EvasionScope;
 
@@ -110,6 +110,10 @@ pub struct EvasionOptions {
     pub chunk_size: usize,
     #[serde(default)]
     pub custom_offsets: Vec<usize>,
+    #[serde(default)]
+    pub split_offsets: Vec<String>,
+    #[serde(default)]
+    pub tlsrec_offset: Option<String>,
     #[serde(default = "default_delay_ms")]
     pub delay_ms: u64,
     #[serde(default)]
@@ -167,6 +171,8 @@ impl Default for EvasionOptions {
             split_mode: default_split_mode(),
             chunk_size: default_chunk_size(),
             custom_offsets: Vec::new(),
+            split_offsets: Vec::new(),
+            tlsrec_offset: None,
             delay_ms: default_delay_ms(),
             disorder: false,
             tls_record_split: false,
@@ -336,6 +342,23 @@ impl AppConfig {
         // Apply fine-grained overrides
         strat.chunk_size = self.evasion.chunk_size;
         strat.custom_offsets = self.evasion.custom_offsets.clone();
+
+        for off_str in &self.evasion.split_offsets {
+            if let Ok(off) = SplitOffset::parse(off_str) {
+                strat.dynamic_offsets.push(off);
+            }
+        }
+        if !strat.dynamic_offsets.is_empty() && (self.evasion.split_mode == "sni" || self.evasion.split_mode == "custom") {
+            strat.split_mode = SplitMode::Custom;
+        }
+
+        if let Some(ref rec_str) = self.evasion.tlsrec_offset {
+            if let Ok(off) = SplitOffset::parse(rec_str) {
+                strat.tlsrec_offset = Some(off);
+                strat.tls_record_split = true;
+            }
+        }
+
         strat.delay_ms = self.evasion.delay_ms;
         if self.evasion.disorder {
             strat.disorder = true;
@@ -415,6 +438,11 @@ chunk_size = 40
 # Custom byte split offsets when split_mode = "custom" (e.g. [1, 5, 20])
 custom_offsets = []
 
+# Dynamic SNI-relative split offsets (takes precedence over custom_offsets)
+# Supports "N+s" (relative to SNI start), "N+se" (relative to SNI end), "+m" (mid-sni), and absolute numbers
+# e.g., ["1+s", "3+s", "6+s", "9+s", "12+s", "15+s", "20+s", "30+s"]
+split_offsets = []
+
 # Delay between sending TCP segments in milliseconds (prevents packet coalescing)
 delay_ms = 2
 
@@ -423,6 +451,9 @@ disorder = false
 
 # Fragment TLS ClientHello across multiple TLS record layers (RFC compliant)
 tls_record_split = false
+
+# Split position for TLS record layer (e.g. "-5+se", "1+s", "+m", "sni", "mid-sni", "first-byte", "2")
+# tlsrec_offset = "-5+se"
 
 # Inject decoy packet with low TTL before real packet
 enable_fake = false

@@ -41,15 +41,24 @@ evadedpi test blocked-site.com
       Testing TLS Record Layer Split             ... PASS (484ms)
       Testing Disorder (Reverse Segment Order)   ... PASS (216ms)
       Testing Fake Decoy SNI (Low TTL)           ... PASS (1093ms)
+      Testing Mid-SNI Split (Split inside SNI)   ... PASS (110ms)
+      Testing MultiSplit (3-chunk SNI split)     ... PASS (115ms)
+      Testing Mixed SNI Casing + MultiSplit      ... PASS (112ms)
 ```
 - Compare the results: whichever strategy indicates `PASS` with the lowest latency is the optimal strategy for your ISP!
   - If **Fake Decoy SNI** passes while **SNI Segmentation** fails: your ISP utilizes stateful flow tracking (e.g. Russia TSPU). Launch with:
     ```bash
     evadedpi --preset russia
     ```
-  - If **TLS Record Layer Split** passes while others fail: launch with:
+  - If **TLS Record Layer Split** passes: launch with:
     ```bash
     evadedpi --tlsrec
+    # or with custom record split offset:
+    evadedpi --tlsrec --tlsrec-offset "-5+se"
+    ```
+  - If **MultiSplit / Mixed SNI** passes: launch with:
+    ```bash
+    evadedpi -s multisplit --mix-sni
     ```
 
 ---

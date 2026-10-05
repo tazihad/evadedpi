@@ -54,7 +54,7 @@ use cli::{Cli, Commands, RunArgs};
 use config::AppConfig;
 use dns::Resolver;
 use proxy::{print_env_hints, run_server, ServerConfig, SessionTracker, SystemProxyGuard};
-use rules::RuleFilter;
+use rules::{RuleFilter, StrategyRouter};
 use ui::{print_banner, print_startup_summary, start_stats_display};
 
 #[tokio::main]
@@ -185,19 +185,33 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
     if args.no_doh {
         config.dns.enable_doh = false;
     }
+    if !args.split_offsets.is_empty() {
+        config.evasion.split_offsets = args.split_offsets.clone();
+        config.evasion.split_mode = "custom".to_string();
+    }
+    if let Some(ref rec) = args.tlsrec_offset {
+        config.evasion.tlsrec_offset = Some(rec.clone());
+        config.evasion.tls_record_split = true;
+    }
     if let Some(r) = args.rules {
         config.rules.rules_file = Some(r);
     }
     if args.scope != "all" {
         config.rules.scope = args.scope;
     }
-    if args.system_proxy {
-        config.server.system_proxy = true;
-    }
+    config.server.system_proxy = if args.system_proxy {
+        true
+    } else if args.config.is_some() {
+        config.server.system_proxy
+    } else {
+        false
+    };
 
     // 3. Build Core Components
     let bind_addr = config.socket_addr()?;
     let strategy = config.build_evasion_strategy();
+    let router = Arc::new(StrategyRouter::new(strategy.clone()));
+
     let doh_provider = config.doh_provider();
     let resolver = Arc::new(Resolver::new(doh_provider.clone(), config.dns.prefer_ipv4));
 
@@ -260,6 +274,7 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
     let server_cfg = ServerConfig {
         bind_addr,
         strategy,
+        router: Some(router),
         resolver,
         filter,
         stats,

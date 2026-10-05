@@ -33,4 +33,4 @@
 
 pub mod test_site;
 
-pub use test_site::{run_diagnostic, DiagnosticReport, ProbeResult};
+pub use test_site::{normalize_target_domain, run_diagnostic, DiagnosticReport, ProbeResult};

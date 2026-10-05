@@ -89,7 +89,18 @@ pub fn print_startup_summary(
     println!(
         "│ {} {:<47} │",
         "Split Strategy:  ".bold().white(),
-        format!("{} (delay: {}ms)", strategy.split_mode, strategy.delay_ms).cyan()
+        if !strategy.dynamic_offsets.is_empty() {
+            let desc: Vec<String> = strategy.dynamic_offsets.iter().map(|o| o.to_string()).collect();
+            let joined = desc.join(",");
+            let truncated = if joined.len() > 30 {
+                format!("custom ({}...)", &joined[..27])
+            } else {
+                format!("custom ({})", joined)
+            };
+            truncated.cyan()
+        } else {
+            format!("{} (delay: {}ms)", strategy.split_mode, strategy.delay_ms).cyan()
+        }
     );
     println!(
         "│ {} {:<47} │",
@@ -115,7 +126,11 @@ pub fn print_startup_summary(
         "│ {} {:<47} │",
         "TLS Record Split:".bold().white(),
         if strategy.tls_record_split {
-            "Enabled".green().bold()
+            if let Some(ref off) = strategy.tlsrec_offset {
+                format!("Enabled ({})", off).green().bold()
+            } else {
+                "Enabled".green().bold()
+            }
         } else {
             "Disabled".dimmed()
         }

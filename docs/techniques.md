@@ -41,7 +41,7 @@ When Packet 1 arrives at the middlebox:
 
 ---
 
-## 2. TLS Record Layer Fragmentation (`--tlsrec`)
+## 2. TLS Record Layer Fragmentation (`--tlsrec`, `--tlsrec-offset`)
 
 ### The Problem
 Some advanced DPI middleboxes (such as modern TSPU in Russia) perform full TCP stream reassembly for individual packets to thwart standard TCP segmentation.
@@ -65,6 +65,15 @@ Record 2 (Header: 0x16 0x03 0x01 [Length N2]):
 ```
 
 The DPI middlebox expects the entire ClientHello to reside in the first TLS record. Failing to locate the SNI in Record 1, it allows the flow. The web server's TLS engine seamlessly merges both records into one handshake message.
+
+### Custom TLS Record Offset Selection (`--tlsrec-offset`)
+By default, `--tlsrec` cuts the record boundary immediately before the SNI domain name. However, some middleboxes scan for TLS record continuation fragments that start with domain patterns.
+
+With `--tlsrec-offset <OFFSET>`, EvadeDPI can position the record boundary dynamically:
+- **`--tlsrec-offset "-5+se"`**: Splits 5 bytes before the end of the SNI domain, burying the start of the domain in Record 1 and only the tail in Record 2.
+- **`--tlsrec-offset mid-sni`** (or `+m`): Splits the record directly at the midpoint of the SNI string.
+- **`--tlsrec-offset 1+s`**: Splits 1 byte into the SNI domain.
+- **`--tlsrec-offset 2`**: Splits at absolute byte index 2 (inside the initial handshake version/length).
 
 ---
 
@@ -117,7 +126,7 @@ For unencrypted HTTP connections, EvadeDPI supports classic GoodbyeDPI and ByeDP
 
 ---
 
-## 7. QUIC / HTTP3 Blocking (`--block-quic`)
+## 7. QUIC / HTTP3 Blocking (Default Active, Disable with `--allow-quic`)
 
 ### Why Block QUIC?
 QUIC (RFC 9000) runs over UDP port 443. While modern and performant, QUIC packets:
@@ -168,3 +177,42 @@ When `--mix-sni` is enabled, EvadeDPI randomizes the casing of letters within th
 During bidirectional proxy streaming, half-closed sockets, NAT timeouts, or middlebox silent packet drops can cause connections to hang indefinitely. This causes file descriptor leaks and memory accumulation over time.
 
 EvadeDPI implements an automatic **Idle Connection Reaper** (`--idle-timeout 120`). If neither the client nor upstream server transfers data for the configured duration, the tunnel is cleanly shut down and its memory and sockets are reclaimed.
+
+---
+
+## 12. Dynamic SNI-Relative Offset Splitting (`--split-offsets`)
+
+### The Problem: Reassembly Buffers & Fixed Offset Detection
+Static splitting (e.g. always splitting at byte 2 or byte 40) is easily countered by DPI hardware with reassembly buffers sized for fixed byte offsets. Furthermore, domain names vary significantly in length and position within the TLS ClientHello extension list depending on client cipher suites, ALPN values, and GREASE extensions.
+
+### The Solution: Dynamic Anchor-Relative Offsets
+EvadeDPI dynamically inspects the outgoing ClientHello, calculates the exact byte boundaries of the SNI extension payload (`sni_start` and `sni_end`), and resolves user-specified offsets dynamically per-connection:
+
+```text
+TLS ClientHello Stream:
+[TLS Record & Handshake Headers] ... [SNI Extension Header] [Host Name:  y o u t u b e . c o m] [Other Extensions]
+                                                            ▲            ▲               ▲
+                                                            │            │               │
+                                                         sni_start     +m (mid)        sni_end
+                                                         (0+s)                         (0+se)
+```
+
+### Supported Syntax
+- **`N+s`**: Relative to the start of the SNI hostname.
+  - `1+s`: Splits 1 byte after the domain name begins.
+  - `3+s`: Splits 3 bytes after the domain name begins.
+- **`N+se`**: Relative to the end of the SNI hostname.
+  - `-5+se`: Splits 5 bytes before the end of the domain name.
+  - `0+se`: Splits exactly at the end of the domain name.
+- **`+m` / `mid-sni`**: Splits at `sni_start + (sni_len / 2)`.
+- **`N`**: Absolute byte offset from the beginning of the payload.
+
+### Multi-Segment Micro-Chunking
+By specifying a comma-separated chain of offsets, EvadeDPI fragments the ClientHello into numerous small TCP packets (e.g. 8+ chunks), each separated by `--delay-ms`:
+
+```bash
+evadedpi --split-offsets "1+s,3+s,6+s,9+s,12+s,15+s,20+s,30+s" --delay-ms 2
+```
+
+Because the SNI hostname is fragmented into 2-to-3 byte slivers across multiple packets, DPI middleboxes cannot extract the target domain without maintaining prohibitive per-flow reassembly buffers. Combined with `--oob`, middlebox sequence tracking is completely disrupted while origin web servers reassemble the TCP stream transparently.
+

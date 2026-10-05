@@ -119,6 +119,14 @@ pub struct RunArgs {
     #[arg(long)]
     pub tlsrec: bool,
 
+    /// Split position for TLS record layer (e.g. "sni", "mid-sni", "first-byte", "-5+se", "2")
+    #[arg(long, allow_hyphen_values = true)]
+    pub tlsrec_offset: Option<String>,
+
+    /// Custom split offsets, comma-separated (e.g. "1+s,3+s,6+s,9+s,12+s,15+s,20+s,30+s" or "20,40,60")
+    #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
+    pub split_offsets: Vec<String>,
+
     /// Randomize SNI hostname character casing (RFC 6066 case-insensitive) to evade case-sensitive DPI
     #[arg(long)]
     pub mix_sni: bool,

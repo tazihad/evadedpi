@@ -40,5 +40,5 @@ pub mod tls;
 pub use fake::generate_fake_client_hello;
 pub use http::{mutate_http_request, parse_http_request, HttpEvasionOptions, HttpRequestInfo};
 pub use socket::{configure_evasion_socket, send_oob_byte, set_socket_ttl};
-pub use strategy::{EvasionStrategy, SegmentChunk, SplitMode};
+pub use strategy::{EvasionStrategy, SegmentChunk, SplitMode, SplitOffset};
 pub use tls::{is_client_hello, mutate_sni_casing, parse_client_hello, split_into_tls_records, ClientHelloInfo};

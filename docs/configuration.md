@@ -30,6 +30,9 @@ port = 1080
 # TCP tunnel idle reaper timeout in seconds. Automatically closes dead/hanging tunnels.
 idle_timeout_secs = 120
 
+# Automatically configure OS system proxy while running and restore on exit
+system_proxy = false
+
 
 [evasion]
 # Predefined baseline profile:
@@ -58,6 +61,11 @@ chunk_size = 40
 # e.g., [1, 5, 20] splits at byte 1, byte 5, and byte 20
 custom_offsets = []
 
+# Dynamic SNI-relative split offsets (takes precedence over custom_offsets)
+# Supports "N+s" (relative to SNI start), "N+se" (relative to SNI end), "+m" (mid-sni), and absolute numbers
+# e.g., ["1+s", "3+s", "6+s", "9+s", "12+s", "15+s", "20+s", "30+s"]
+split_offsets = []
+
 # Delay between sending TCP segments in milliseconds.
 # 2-5ms is recommended to ensure packets are not coalesced by middleboxes.
 delay_ms = 2
@@ -67,6 +75,9 @@ disorder = false
 
 # Fragment the ClientHello across multiple TLS record layer headers
 tls_record_split = false
+
+# Split position for TLS record layer (e.g. "-5+se", "1+s", "+m", "sni", "mid-sni", "first-byte", "2")
+# tlsrec_offset = "-5+se"
 
 # Inject decoy fake ClientHello packet with low TTL before the real packet
 enable_fake = false

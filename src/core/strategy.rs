@@ -78,6 +78,103 @@ impl fmt::Display for SplitMode {
     }
 }
 
+/// Represents a split offset position that can be absolute or relative to the SNI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SplitOffset {
+    /// Absolute byte index from beginning of the payload.
+    Absolute(usize),
+    /// Relative offset from the start of the SNI hostname (e.g. "1+s", "3+s").
+    SniStartRelative(i32),
+    /// Relative offset from the end of the SNI hostname (e.g. "-5+se", "0+se").
+    SniEndRelative(i32),
+    /// Center / middle of the SNI hostname.
+    SniMiddle,
+}
+
+impl SplitOffset {
+    /// Parse a split offset expression (e.g. "1+s", "3+s", "-5+se", "+m", "40", "sni").
+    pub fn parse(s: &str) -> anyhow::Result<Self> {
+        let trimmed = s.trim();
+        if trimmed.eq_ignore_ascii_case("+m")
+            || trimmed.eq_ignore_ascii_case("midsni")
+            || trimmed.eq_ignore_ascii_case("mid-sni")
+        {
+            return Ok(SplitOffset::SniMiddle);
+        }
+        if trimmed.eq_ignore_ascii_case("sni") {
+            return Ok(SplitOffset::SniStartRelative(0));
+        }
+        if trimmed.eq_ignore_ascii_case("first-byte") || trimmed.eq_ignore_ascii_case("firstbyte") {
+            return Ok(SplitOffset::Absolute(1));
+        }
+
+        if let Some(pos) = trimmed
+            .strip_suffix("+se")
+            .or_else(|| trimmed.strip_suffix("+es"))
+            .or_else(|| trimmed.strip_suffix("+e"))
+        {
+            let offset: i32 = pos
+                .parse()
+                .map_err(|e| anyhow::anyhow!("Invalid SNI-end relative offset '{}': {}", s, e))?;
+            return Ok(SplitOffset::SniEndRelative(offset));
+        }
+
+        if let Some(pos) = trimmed.strip_suffix("+s") {
+            let offset: i32 = pos
+                .parse()
+                .map_err(|e| anyhow::anyhow!("Invalid SNI-start relative offset '{}': {}", s, e))?;
+            return Ok(SplitOffset::SniStartRelative(offset));
+        }
+
+        let abs: usize = trimmed
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Invalid byte offset '{}': {}", s, e))?;
+        Ok(SplitOffset::Absolute(abs))
+    }
+
+    /// Resolve offset to an actual byte index within the buffer.
+    pub fn resolve(&self, total_len: usize, sni_start: usize, sni_end: usize) -> Option<usize> {
+        let raw = match *self {
+            SplitOffset::Absolute(n) => n as i64,
+            SplitOffset::SniStartRelative(offset) => {
+                if sni_start == 0 {
+                    return None;
+                }
+                (sni_start as i64) + (offset as i64)
+            }
+            SplitOffset::SniEndRelative(offset) => {
+                if sni_end == 0 || sni_end < sni_start {
+                    return None;
+                }
+                (sni_end as i64) + (offset as i64)
+            }
+            SplitOffset::SniMiddle => {
+                if sni_start == 0 || sni_end <= sni_start {
+                    return None;
+                }
+                (sni_start as i64) + ((sni_end - sni_start) / 2) as i64
+            }
+        };
+
+        if raw > 0 && (raw as usize) < total_len {
+            Some(raw as usize)
+        } else {
+            None
+        }
+    }
+}
+
+impl fmt::Display for SplitOffset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SplitOffset::Absolute(n) => write!(f, "{}", n),
+            SplitOffset::SniStartRelative(n) => write!(f, "{}+s", n),
+            SplitOffset::SniEndRelative(n) => write!(f, "{}+se", n),
+            SplitOffset::SniMiddle => write!(f, "mid-sni"),
+        }
+    }
+}
+
 /// Comprehensive configuration for the evasion engine per-connection.
 #[derive(Debug, Clone)]
 pub struct EvasionStrategy {
@@ -87,6 +184,10 @@ pub struct EvasionStrategy {
     pub chunk_size: usize,
     /// Custom split offsets (used if split_mode == Custom).
     pub custom_offsets: Vec<usize>,
+    /// Dynamic split offsets (e.g. 1+s, 3+s, -5+se, or absolute numbers).
+    pub dynamic_offsets: Vec<SplitOffset>,
+    /// Custom TLS record split offset (e.g. -5+se, 2, sni, mid-sni).
+    pub tlsrec_offset: Option<SplitOffset>,
     /// Delay between sending successive segments in milliseconds.
     pub delay_ms: u64,
     /// Whether to send segments in reverse / out-of-order.
@@ -115,6 +216,8 @@ impl Default for EvasionStrategy {
             split_mode: SplitMode::Sni,
             chunk_size: 40,
             custom_offsets: Vec::new(),
+            dynamic_offsets: Vec::new(),
+            tlsrec_offset: None,
             delay_ms: 2,
             disorder: false,
             tls_record_split: false,
@@ -255,20 +358,41 @@ impl EvasionStrategy {
 
         // A. If TLS Record splitting is enabled, wrap into multiple TLS records first!
         if self.tls_record_split {
-            let split_pos = match self.split_mode {
-                SplitMode::FirstByte => 6, // 1st byte of handshake payload
-                SplitMode::Sni => {
-                    if let Some(info) = parse_client_hello(buffer) {
-                        if info.sni_offset_start > 5 {
-                            info.sni_offset_start
+            let split_pos = if let Some(ref custom_rec) = self.tlsrec_offset {
+                if let Some(info) = parse_client_hello(buffer) {
+                    custom_rec
+                        .resolve(buffer.len(), info.sni_offset_start, info.sni_offset_end)
+                        .unwrap_or(buffer.len() / 2)
+                } else {
+                    buffer.len() / 2
+                }
+            } else {
+                match self.split_mode {
+                    SplitMode::FirstByte => 6, // 1st byte of handshake payload
+                    SplitMode::Sni => {
+                        if let Some(info) = parse_client_hello(buffer) {
+                            if info.sni_offset_start > 5 {
+                                info.sni_offset_start
+                            } else {
+                                buffer.len() / 2
+                            }
                         } else {
                             buffer.len() / 2
                         }
-                    } else {
-                        buffer.len() / 2
                     }
+                    SplitMode::MidSni | SplitMode::MultiSplit => {
+                        if let Some(info) = parse_client_hello(buffer) {
+                            if info.sni_offset_start > 0 && info.sni_offset_end > info.sni_offset_start {
+                                info.sni_offset_start + (info.sni_offset_end - info.sni_offset_start) / 2
+                            } else {
+                                buffer.len() / 2
+                            }
+                        } else {
+                            buffer.len() / 2
+                        }
+                    }
+                    _ => buffer.len() / 2,
                 }
-                _ => buffer.len() / 2,
             };
 
             if let Some((rec1, rec2)) = split_into_tls_records(buffer, split_pos) {
@@ -410,7 +534,24 @@ impl EvasionStrategy {
                 chunks
             }
             SplitMode::Custom => {
-                if self.custom_offsets.is_empty() {
+                let resolved_offsets = if !self.dynamic_offsets.is_empty() {
+                    let (sni_start, sni_end) = parse_client_hello(buffer)
+                        .map(|info| (info.sni_offset_start, info.sni_offset_end))
+                        .unwrap_or((0, 0));
+
+                    let mut list: Vec<usize> = self
+                        .dynamic_offsets
+                        .iter()
+                        .filter_map(|off| off.resolve(buffer.len(), sni_start, sni_end))
+                        .collect();
+                    list.sort_unstable();
+                    list.dedup();
+                    list
+                } else {
+                    self.custom_offsets.clone()
+                };
+
+                if resolved_offsets.is_empty() {
                     return vec![SegmentChunk {
                         data: buffer.to_vec(),
                         delay_after: Duration::ZERO,
@@ -420,7 +561,7 @@ impl EvasionStrategy {
                 }
                 let mut chunks = Vec::new();
                 let mut last = 0;
-                for &offset in &self.custom_offsets {
+                for &offset in &resolved_offsets {
                     if offset > last && offset < buffer.len() {
                         chunks.push(SegmentChunk {
                             data: buffer[last..offset].to_vec(),
@@ -561,5 +702,68 @@ mod tests {
         assert_eq!(segments.len(), 3);
         let reconstructed: Vec<u8> = segments.iter().flat_map(|s| s.data.clone()).collect();
         assert_eq!(reconstructed, pkt);
+    }
+
+    #[test]
+    fn test_mid_sni_tls_record_split() {
+        let pkt = create_test_client_hello("example.com");
+        let strat = EvasionStrategy {
+            split_mode: SplitMode::MidSni,
+            tls_record_split: true,
+            delay_ms: 2,
+            ..Default::default()
+        };
+        let segments = strat.plan_tls_segments(&pkt);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].data[0], 0x16);
+        assert_eq!(segments[1].data[0], 0x16);
+    }
+
+    #[test]
+    fn test_split_offset_parsing() {
+        assert_eq!(SplitOffset::parse("40").unwrap(), SplitOffset::Absolute(40));
+        assert_eq!(SplitOffset::parse("1+s").unwrap(), SplitOffset::SniStartRelative(1));
+        assert_eq!(SplitOffset::parse("3+s").unwrap(), SplitOffset::SniStartRelative(3));
+        assert_eq!(SplitOffset::parse("-5+se").unwrap(), SplitOffset::SniEndRelative(-5));
+        assert_eq!(SplitOffset::parse("+m").unwrap(), SplitOffset::SniMiddle);
+        assert_eq!(SplitOffset::parse("mid-sni").unwrap(), SplitOffset::SniMiddle);
+        assert_eq!(SplitOffset::parse("sni").unwrap(), SplitOffset::SniStartRelative(0));
+        assert_eq!(SplitOffset::parse("first-byte").unwrap(), SplitOffset::Absolute(1));
+    }
+
+    #[test]
+    fn test_dynamic_custom_offsets_tls() {
+        let pkt = create_test_client_hello("example.com");
+        let strat = EvasionStrategy {
+            split_mode: SplitMode::Custom,
+            dynamic_offsets: vec![
+                SplitOffset::parse("1+s").unwrap(),
+                SplitOffset::parse("3+s").unwrap(),
+                SplitOffset::parse("6+s").unwrap(),
+            ],
+            delay_ms: 2,
+            ..Default::default()
+        };
+        let segments = strat.plan_tls_segments(&pkt);
+        // 3 split points => 4 chunks
+        assert_eq!(segments.len(), 4);
+        let reconstructed: Vec<u8> = segments.iter().flat_map(|s| s.data.clone()).collect();
+        assert_eq!(reconstructed, pkt);
+    }
+
+    #[test]
+    fn test_custom_tlsrec_offset() {
+        let pkt = create_test_client_hello("example.com");
+        let strat = EvasionStrategy {
+            split_mode: SplitMode::Sni,
+            tls_record_split: true,
+            tlsrec_offset: Some(SplitOffset::parse("-5+se").unwrap()),
+            delay_ms: 2,
+            ..Default::default()
+        };
+        let segments = strat.plan_tls_segments(&pkt);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].data[0], 0x16);
+        assert_eq!(segments[1].data[0], 0x16);
     }
 }

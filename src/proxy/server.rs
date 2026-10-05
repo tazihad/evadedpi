@@ -43,13 +43,14 @@ use super::socks5::handle_socks5;
 use crate::core::strategy::EvasionStrategy;
 use crate::core::tls::parse_client_hello;
 use crate::dns::Resolver;
-use crate::rules::RuleFilter;
+use crate::rules::{RuleFilter, StrategyRouter};
 
 /// Configuration parameters for the running proxy server.
 #[derive(Clone)]
 pub struct ServerConfig {
     pub bind_addr: SocketAddr,
     pub strategy: EvasionStrategy,
+    pub router: Option<Arc<StrategyRouter>>,
     pub resolver: Arc<Resolver>,
     pub filter: Arc<RuleFilter>,
     pub stats: SessionTracker,
@@ -149,12 +150,18 @@ async fn run_tunnel(
     let identified_sni = parse_client_hello(&initial_data).and_then(|info| info.sni);
     let effective_host = identified_sni.as_deref().unwrap_or(&target_host);
 
+    let applicable_strategy = if let Some(ref router) = cfg.router {
+        router.get_strategy(effective_host)
+    } else {
+        &cfg.strategy
+    };
+
     if should_evade {
         debug!(
             "Applying DPI circumvention to host '{}' (SNI: {:?}, Strategy: {})",
-            effective_host, identified_sni, cfg.strategy.split_mode
+            effective_host, identified_sni, applicable_strategy.split_mode
         );
-        let sent = cfg.strategy.desync_and_send(&mut upstream, &initial_data).await?;
+        let sent = applicable_strategy.desync_and_send(&mut upstream, &initial_data).await?;
         cfg.stats.record_bypassed();
         cfg.stats.add_bytes_sent(sent as u64);
     } else {

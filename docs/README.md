@@ -23,12 +23,13 @@ Welcome to the official documentation for **EvadeDPI** (`evadedpi`), a modern, h
 
 3. [**CLI Reference**](cli-reference.md)
    - Complete manual of all command-line arguments, flags, and options
-   - Subcommands: `run`, `test`, `presets`, `generate-config`, `completions`
+   - Subcommands: `run`, `test`, `presets`, `reset-proxy`, `generate-config`, `completions`
+   - Dynamic SNI-relative offset syntax (`--split-offsets`, `--tlsrec-offset`)
    - Exit codes and logging levels
 
 4. [**Configuration Guide**](configuration.md)
    - Structure of `evadedpi.toml`
-   - Pre-configured regional profiles (`general`, `russia`, `iran`, `china`, `turkey`, `extreme`)
+   - Pre-configured regional profiles (`general`, `first-byte`, `russia`, `iran`, `china`, `turkey`, `discord-youtube`, `extreme`)
    - Domain rule filtering syntax (exact match, wildcard, suffixes, allowlist/blocklist)
 
 5. [**Client Setup Guide**](client-setup.md)
