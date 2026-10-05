@@ -220,7 +220,7 @@ docker run -d --name evadedpi -p 9090:9090 --restart unless-stopped tazihad/evad
 docker run -d --name evadedpi -p 9090:9090 --restart unless-stopped tazihad/evadedpi --preset discord-youtube
 
 # Or run with Docker Compose:
-docker compose up -d
+docker compose -f docker/docker-compose.yml up -d
 ```
 
 ---
