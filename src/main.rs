@@ -1,5 +1,34 @@
-// EvadeDPI: Modern Deep Packet Inspection Circumvention Engine
-// Main Application Entry Point
+// -----------------------------------------------------------------------------
+// File Name:      src/main.rs
+// Description:    Main application entry point, CLI dispatcher, and runtime orchestrator.
+// Author:         @tazihad
+// Website:        https://zihad.com.bd
+// License:        MIT License
+// -----------------------------------------------------------------------------
+
+// MIT License
+//
+// Copyright (c) 2024 @tazihad
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+// -----------------------------------------------------------------------------
+
 #![allow(dead_code)]
 
 use anyhow::Result;
@@ -8,6 +37,7 @@ use colored::*;
 use std::fs;
 use std::io;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -124,6 +154,9 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
     if args.tlsrec {
         config.evasion.tls_record_split = true;
     }
+    if args.mix_sni {
+        config.evasion.mix_sni = true;
+    }
     if args.fake {
         config.evasion.enable_fake = true;
     }
@@ -138,6 +171,9 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
     }
     if args.allow_quic {
         config.evasion.block_quic = false;
+    }
+    if args.idle_timeout != 120 {
+        config.server.idle_timeout_secs = args.idle_timeout;
     }
     if args.doh != "cloudflare" {
         config.dns.doh_provider = args.doh;
@@ -192,6 +228,7 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
         resolver,
         filter,
         stats,
+        idle_timeout: Duration::from_secs(config.server.idle_timeout_secs),
     };
 
     tokio::select! {
@@ -213,50 +250,57 @@ fn print_presets() {
     println!("{}", "               EvadeDPI Evasion Profiles                  ".bold().yellow());
     println!("{}", "==========================================================".cyan());
     println!(
-        "{:<14} : {}\n  {}",
+        "{:<15} : {}\n  {}",
         "general".bold().green(),
         "Balanced SNI splitting with 2ms delay and DoH.",
         "Recommended default for most ISPs (bypasses standard SNI inspection)."
     );
     println!(
-        "{:<14} : {}\n  {}",
+        "{:<15} : {}\n  {}",
         "first-byte".bold().green(),
         "1-byte TCP payload splitting (1 byte + remaining handshake).",
         "Classic SpoofDPI approach, highly effective against simple middleboxes."
     );
     println!(
-        "{:<14} : {}\n  {}",
+        "{:<15} : {}\n  {}",
         "russia".bold().green(),
         "SNI split + decoy TLS ClientHello injection with low TTL (TTL=4).",
         "Optimized for Russian TSPU / RKN hardware middleboxes."
     );
     println!(
-        "{:<14} : {}\n  {}",
+        "{:<15} : {}\n  {}",
+        "discord-youtube".bold().green(),
+        "MultiSplit (3-chunk SNI) + Decoy injection + SNI casing randomization.",
+        "Engineered to bypass throttling and blocking on YouTube and Discord."
+    );
+    println!(
+        "{:<15} : {}\n  {}",
         "iran".bold().green(),
         "First-byte split + TLS record layer fragmentation + 5ms delay.",
         "Engineered for deep multi-layered packet inspection in Iran."
     );
     println!(
-        "{:<14} : {}\n  {}",
+        "{:<15} : {}\n  {}",
         "china".bold().green(),
         "Chunked TLS segmentation (20 bytes) + decoy packet + DoH.",
         "Tailored to evade stateful flow reassembly engines."
     );
     println!(
-        "{:<14} : {}\n  {}",
+        "{:<15} : {}\n  {}",
         "turkey".bold().green(),
         "First-byte split + HTTP Host casing & space trickery + DoH.",
         "Bypasses ISP filtering in Turkey."
     );
     println!(
-        "{:<14} : {}\n  {}",
+        "{:<15} : {}\n  {}",
         "extreme".bold().green(),
         "All techniques combined: SNI split, TLS record split, fake packet, disorder.",
         "Maximum desynchronization for highly restrictive censorship."
     );
     println!("{}", "----------------------------------------------------------".cyan());
     println!(
-        "Usage: evadedpi --preset <name>  (e.g., evadedpi --preset russia)"
+        "Usage: evadedpi --preset <name>  (e.g., evadedpi --preset discord-youtube)"
     );
     println!("{}", "==========================================================".cyan());
 }
+

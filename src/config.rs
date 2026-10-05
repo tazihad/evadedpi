@@ -1,5 +1,33 @@
-// EvadeDPI: Modern Deep Packet Inspection Circumvention Engine
-// Configuration Management, Presets, and TOML Serialization
+// -----------------------------------------------------------------------------
+// File Name:      src/config.rs
+// Description:    Configuration management, presets, and TOML serialization.
+// Author:         @tazihad
+// Website:        https://zihad.com.bd
+// License:        MIT License
+// -----------------------------------------------------------------------------
+
+// MIT License
+//
+// Copyright (c) 2024 @tazihad
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+// -----------------------------------------------------------------------------
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -45,6 +73,8 @@ pub struct ServerOptions {
     pub bind: String,
     #[serde(default = "default_port")]
     pub port: u16,
+    #[serde(default = "default_idle_timeout")]
+    pub idle_timeout_secs: u64,
 }
 
 fn default_bind() -> String {
@@ -53,12 +83,16 @@ fn default_bind() -> String {
 fn default_port() -> u16 {
     1080
 }
+fn default_idle_timeout() -> u64 {
+    120
+}
 
 impl Default for ServerOptions {
     fn default() -> Self {
         Self {
             bind: default_bind(),
             port: default_port(),
+            idle_timeout_secs: default_idle_timeout(),
         }
     }
 }
@@ -89,6 +123,8 @@ pub struct EvasionOptions {
     pub enable_oob: bool,
     #[serde(default = "default_true")]
     pub block_quic: bool,
+    #[serde(default)]
+    pub mix_sni: bool,
     #[serde(default = "default_true")]
     pub mix_host: bool,
     #[serde(default = "default_true")]
@@ -136,6 +172,7 @@ impl Default for EvasionOptions {
             fake_ttl: default_fake_ttl(),
             enable_oob: false,
             block_quic: true,
+            mix_sni: false,
             mix_host: true,
             host_space_trim: true,
             extra_method_space: false,
@@ -254,6 +291,16 @@ impl AppConfig {
                 },
                 ..Default::default()
             },
+            "discord-youtube" | "youtube-discord" => EvasionStrategy {
+                split_mode: SplitMode::MultiSplit,
+                delay_ms: 2,
+                mix_sni: true,
+                enable_fake: true,
+                fake_sni: "www.google.com".to_string(),
+                fake_ttl: 4,
+                block_quic: true,
+                ..Default::default()
+            },
             "extreme" => EvasionStrategy {
                 split_mode: SplitMode::Sni,
                 tls_record_split: true,
@@ -272,6 +319,8 @@ impl AppConfig {
         if self.evasion.split_mode != "sni" || self.evasion.preset == "general" {
             strat.split_mode = match self.evasion.split_mode.to_ascii_lowercase().as_str() {
                 "sni" => SplitMode::Sni,
+                "mid-sni" | "midsni" => SplitMode::MidSni,
+                "multisplit" | "multi-split" => SplitMode::MultiSplit,
                 "first-byte" => SplitMode::FirstByte,
                 "chunk" => SplitMode::Chunk,
                 "random" => SplitMode::Random,
@@ -300,6 +349,9 @@ impl AppConfig {
             strat.enable_oob = true;
         }
         strat.block_quic = self.evasion.block_quic;
+        if self.evasion.mix_sni {
+            strat.mix_sni = true;
+        }
 
         strat.http_evasion = HttpEvasionOptions {
             mix_host: self.evasion.mix_host,
@@ -339,13 +391,18 @@ impl AppConfig {
 bind = "127.0.0.1"
 # Port for the unified SOCKS5 and HTTP/HTTPS proxy listener
 port = 1080
+# Connection idle timeout in seconds (reaps dead/abandoned tunnels)
+idle_timeout_secs = 120
 
 [evasion]
-# Pre-configured profile: "general", "first-byte", "russia", "iran", "china", "turkey", "extreme"
+# Pre-configured profile: "general", "first-byte", "russia", "iran", "china", "turkey", "discord-youtube", "extreme"
 preset = "general"
 
-# Splitting mode: "sni", "first-byte", "chunk", "random", "custom", "none"
+# Splitting mode: "sni", "mid-sni", "multisplit", "first-byte", "chunk", "random", "custom", "none"
 split_mode = "sni"
+
+# Randomize SNI hostname casing (RFC 6066 case-insensitive) to bypass case-sensitive DPI middleboxes
+mix_sni = false
 
 # Chunk size in bytes when split_mode = "chunk"
 chunk_size = 40

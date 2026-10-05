@@ -1,9 +1,38 @@
-// EvadeDPI: Modern Deep Packet Inspection Circumvention Engine
-// Unified Dual-Protocol Proxy Server (SOCKS5 + HTTP CONNECT Auto-Detect)
+// -----------------------------------------------------------------------------
+// File Name:      src/proxy/server.rs
+// Description:    Unified dual-protocol proxy server (SOCKS5 + HTTP CONNECT) with idle tunnel reaper.
+// Author:         @tazihad
+// Website:        https://zihad.com.bd
+// License:        MIT License
+// -----------------------------------------------------------------------------
+
+// MIT License
+//
+// Copyright (c) 2024 @tazihad
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+// -----------------------------------------------------------------------------
 
 use anyhow::Result;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::{debug, info, trace, warn};
@@ -24,6 +53,7 @@ pub struct ServerConfig {
     pub resolver: Arc<Resolver>,
     pub filter: Arc<RuleFilter>,
     pub stats: SessionTracker,
+    pub idle_timeout: Duration,
 }
 
 /// Start the EvadeDPI unified proxy listener.
@@ -62,7 +92,7 @@ async fn process_connection(
 
     // Peek at the first byte to auto-detect protocol (0x05 = SOCKS5, ASCII = HTTP)
     let mut peek_buf = [0u8; 1];
-    let n = client.peek(&mut peek_buf).await?;
+    let n = tokio::time::timeout(Duration::from_secs(30), client.peek(&mut peek_buf)).await??;
     if n == 0 {
         return Ok(());
     }
@@ -77,7 +107,7 @@ async fn process_connection(
         trace!("Detected HTTP/HTTPS proxy connection from {}", peer_addr);
         // Read full HTTP request header
         let mut req_buf = vec![0u8; 4096];
-        let bytes_read = client.read(&mut req_buf).await?;
+        let bytes_read = tokio::time::timeout(Duration::from_secs(30), client.read(&mut req_buf)).await??;
         if bytes_read == 0 {
             return Ok(());
         }
@@ -107,7 +137,7 @@ async fn run_tunnel(
     } else {
         // Wait for first data packet from client (typically TLS ClientHello in HTTPS tunnels)
         let mut buf = vec![0u8; 4096];
-        let n = client.read(&mut buf).await?;
+        let n = tokio::time::timeout(Duration::from_secs(30), client.read(&mut buf)).await??;
         if n == 0 {
             return Ok(());
         }
@@ -134,25 +164,30 @@ async fn run_tunnel(
         cfg.stats.add_bytes_sent(initial_data.len() as u64);
     }
 
-    // Now establish full bidirectional streaming for remaining traffic
+    // Now establish full bidirectional streaming with idle connection reaping
     let (mut client_rd, mut client_wr) = client.into_split();
     let (mut upstream_rd, mut upstream_wr) = upstream.into_split();
 
+    let idle_timeout = cfg.idle_timeout;
     let stats_c2u = cfg.stats.clone();
     let client_to_upstream = async move {
         let mut buf = vec![0u8; 16384];
         let mut total = 0u64;
         loop {
-            match client_rd.read(&mut buf).await {
-                Ok(0) => break,
-                Ok(n) => {
+            match tokio::time::timeout(idle_timeout, client_rd.read(&mut buf)).await {
+                Ok(Ok(0)) => break,
+                Ok(Ok(n)) => {
                     if upstream_wr.write_all(&buf[..n]).await.is_err() {
                         break;
                     }
                     total += n as u64;
                     stats_c2u.add_bytes_sent(n as u64);
                 }
-                Err(_) => break,
+                Ok(Err(_)) => break,
+                Err(_) => {
+                    trace!("Client connection timed out after {}s idle", idle_timeout.as_secs());
+                    break;
+                }
             }
         }
         let _ = upstream_wr.shutdown().await;
@@ -164,16 +199,20 @@ async fn run_tunnel(
         let mut buf = vec![0u8; 16384];
         let mut total = 0u64;
         loop {
-            match upstream_rd.read(&mut buf).await {
-                Ok(0) => break,
-                Ok(n) => {
+            match tokio::time::timeout(idle_timeout, upstream_rd.read(&mut buf)).await {
+                Ok(Ok(0)) => break,
+                Ok(Ok(n)) => {
                     if client_wr.write_all(&buf[..n]).await.is_err() {
                         break;
                     }
                     total += n as u64;
                     stats_u2c.add_bytes_received(n as u64);
                 }
-                Err(_) => break,
+                Ok(Err(_)) => break,
+                Err(_) => {
+                    trace!("Upstream connection timed out after {}s idle", idle_timeout.as_secs());
+                    break;
+                }
             }
         }
         let _ = client_wr.shutdown().await;

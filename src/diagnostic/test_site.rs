@@ -1,5 +1,33 @@
-// EvadeDPI: Modern Deep Packet Inspection Circumvention Engine
-// Diagnostic & Censorship Probe Engine (`evadedpi test <domain>`)
+// -----------------------------------------------------------------------------
+// File Name:      src/diagnostic/test_site.rs
+// Description:    Diagnostic probe and censorship benchmark engine (`evadedpi test <domain>`).
+// Author:         @tazihad
+// Website:        https://zihad.com.bd
+// License:        MIT License
+// -----------------------------------------------------------------------------
+
+// MIT License
+//
+// Copyright (c) 2024 @tazihad
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+// -----------------------------------------------------------------------------
 
 use anyhow::Result;
 use colored::*;
@@ -151,6 +179,31 @@ pub async fn run_diagnostic(domain: &str) -> Result<DiagnosticReport> {
                 fake_sni: "www.microsoft.com".to_string(),
                 fake_ttl: 4,
                 split_mode: SplitMode::Sni,
+                delay_ms: 5,
+                ..Default::default()
+            },
+        ),
+        (
+            "Mid-SNI Split (Split inside SNI)",
+            EvasionStrategy {
+                split_mode: SplitMode::MidSni,
+                delay_ms: 5,
+                ..Default::default()
+            },
+        ),
+        (
+            "MultiSplit (3-chunk SNI split)",
+            EvasionStrategy {
+                split_mode: SplitMode::MultiSplit,
+                delay_ms: 5,
+                ..Default::default()
+            },
+        ),
+        (
+            "Mixed SNI Casing + MultiSplit",
+            EvasionStrategy {
+                split_mode: SplitMode::MultiSplit,
+                mix_sni: true,
                 delay_ms: 5,
                 ..Default::default()
             },
