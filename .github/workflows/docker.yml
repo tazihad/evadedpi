@@ -28,12 +28,26 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Check Docker Hub Credentials
+        id: check_docker_hub
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Docker Hub credentials detected. Will push to Docker Hub."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning ::Docker Hub secrets (DOCKER_USERNAME, DOCKER_PASSWORD) not configured. Skipping Docker Hub push."
+          fi
+
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            tazihad/evadedpi
+            ${{ steps.check_docker_hub.outputs.enabled == 'true' && 'tazihad/evadedpi' || '' }}
             ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
@@ -43,7 +57,7 @@ jobs:
             type=ref,event=branch
 
       - name: Log in to Docker Hub
-        if: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
+        if: steps.check_docker_hub.outputs.enabled == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
