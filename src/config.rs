@@ -75,6 +75,8 @@ pub struct ServerOptions {
     pub port: u16,
     #[serde(default = "default_idle_timeout")]
     pub idle_timeout_secs: u64,
+    #[serde(default)]
+    pub system_proxy: bool,
 }
 
 fn default_bind() -> String {
@@ -93,6 +95,7 @@ impl Default for ServerOptions {
             bind: default_bind(),
             port: default_port(),
             idle_timeout_secs: default_idle_timeout(),
+            system_proxy: false,
         }
     }
 }
@@ -393,6 +396,8 @@ bind = "127.0.0.1"
 port = 1080
 # Connection idle timeout in seconds (reaps dead/abandoned tunnels)
 idle_timeout_secs = 120
+# Automatically configure OS system proxy while running and restore on exit
+system_proxy = false
 
 [evasion]
 # Pre-configured profile: "general", "first-byte", "russia", "iran", "china", "turkey", "discord-youtube", "extreme"

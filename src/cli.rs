@@ -64,6 +64,9 @@ pub enum Commands {
     /// List all built-in circumvention presets and their characteristics
     Presets,
 
+    /// Disable the OS system proxy (recovery if evadedpi was force-killed while using --system-proxy)
+    ResetProxy,
+
     /// Generate a documented configuration file template (evadedpi.toml)
     GenerateConfig {
         /// Optional path to write configuration file to (defaults to stdout)
@@ -87,6 +90,10 @@ pub struct RunArgs {
     /// Port to listen on (serves both SOCKS5 and HTTP/HTTPS CONNECT)
     #[arg(short, long, default_value_t = 1080)]
     pub port: u16,
+
+    /// Automatically configure OS system proxy while running and restore on exit
+    #[arg(short = 'S', long = "system-proxy", alias = "sysproxy")]
+    pub system_proxy: bool,
 
     /// Evasion preset profile
     #[arg(long, default_value = "general", value_parser = ["general", "first-byte", "russia", "iran", "china", "turkey", "discord-youtube", "extreme"])]

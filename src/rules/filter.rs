@@ -98,6 +98,36 @@ impl RuleFilter {
         Ok(Self::new(scope, patterns))
     }
 
+    /// Load domain patterns from either an existing file or inline comma-separated domains.
+    pub fn load(scope: EvasionScope, source: &str) -> std::io::Result<Self> {
+        let path = Path::new(source);
+        if path.exists() {
+            Self::from_file(scope, path)
+        } else {
+            let patterns: Vec<String> = source
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            info!(
+                "Loaded {} inline domain filtering rule(s) (Scope: {:?})",
+                patterns.len(),
+                scope
+            );
+            Ok(Self::new(scope, patterns))
+        }
+    }
+
+    /// Total number of configured domain patterns.
+    pub fn len(&self) -> usize {
+        self.patterns.len()
+    }
+
+    /// Returns true if no pattern filters are configured.
+    pub fn is_empty(&self) -> bool {
+        self.patterns.is_empty()
+    }
+
     /// Checks if circumvention tricks should be applied to a given destination host.
     pub fn should_evade(&self, host: &str) -> bool {
         match self.scope {
@@ -172,5 +202,20 @@ mod tests {
         assert!(!rules.should_evade("bank.com"));
         assert!(!rules.should_evade("corp.internal"));
         assert!(rules.should_evade("blocked-site.com"));
+    }
+
+    #[test]
+    fn test_rule_filter_inline_load() {
+        let rules = RuleFilter::load(
+            EvasionScope::AllowList,
+            "youtube.com, x.com, *.instagram.com",
+        )
+        .unwrap();
+
+        assert_eq!(rules.len(), 3);
+        assert!(rules.should_evade("youtube.com"));
+        assert!(rules.should_evade("x.com"));
+        assert!(rules.should_evade("cdn.instagram.com"));
+        assert!(!rules.should_evade("facebook.com"));
     }
 }

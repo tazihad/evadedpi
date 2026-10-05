@@ -53,7 +53,7 @@ mod ui;
 use cli::{Cli, Commands, RunArgs};
 use config::AppConfig;
 use dns::Resolver;
-use proxy::{run_server, ServerConfig, SessionTracker};
+use proxy::{print_env_hints, run_server, ServerConfig, SessionTracker, SystemProxyGuard};
 use rules::RuleFilter;
 use ui::{print_banner, print_startup_summary, start_stats_display};
 
@@ -88,6 +88,10 @@ async fn main() -> Result<()> {
         Some(Commands::Presets) => {
             print_banner();
             print_presets();
+        }
+        Some(Commands::ResetProxy) => {
+            proxy::system_proxy::disable_system_proxy();
+            println!("{} System proxy disabled.", "✓".bold().green());
         }
         Some(Commands::GenerateConfig { output }) => {
             let template = AppConfig::generate_template();
@@ -187,6 +191,9 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
     if args.scope != "all" {
         config.rules.scope = args.scope;
     }
+    if args.system_proxy {
+        config.server.system_proxy = true;
+    }
 
     // 3. Build Core Components
     let bind_addr = config.socket_addr()?;
@@ -195,17 +202,44 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
     let resolver = Arc::new(Resolver::new(doh_provider.clone(), config.dns.prefer_ipv4));
 
     // 4. Load Domain Rules Filter
-    let (filter, rules_count) = if let Some(ref path) = config.rules.rules_file {
+    let (filter, rules_count) = if let Some(ref source) = config.rules.rules_file {
         let scope = config.rule_scope();
-        let rf = RuleFilter::from_file(scope, path)?;
-        (Arc::new(rf), 1) // count loaded
+        let rf = RuleFilter::load(scope, source)?;
+        let count = rf.len();
+        (Arc::new(rf), count)
     } else {
         (Arc::new(RuleFilter::default()), 0)
     };
 
     let stats = SessionTracker::new();
 
-    // 5. Print Startup Summary
+    // 5. Setup System Proxy if enabled
+    let mut proxy_guard: Option<SystemProxyGuard> = if config.server.system_proxy {
+        match SystemProxyGuard::enable(&config.server.bind, config.server.port) {
+            Ok(guard) => {
+                println!(
+                    "{} System proxy successfully enabled ({}:{})",
+                    "[✓]".bold().green(),
+                    config.server.bind.bold().yellow(),
+                    config.server.port.to_string().bold().yellow()
+                );
+                print_env_hints(&config.server.bind, config.server.port);
+                Some(guard)
+            }
+            Err(e) => {
+                eprintln!(
+                    "{} Failed to configure system proxy: {}",
+                    "[!]".bold().red(),
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // 6. Print Startup Summary
     let doh_desc = doh_provider.as_ref().map(|p| p.endpoint());
     print_startup_summary(
         bind_addr,
@@ -213,15 +247,16 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
         &strategy,
         doh_desc,
         rules_count,
+        config.server.system_proxy,
     );
 
-    // 6. Optional Live Stats Display
+    // 7. Optional Live Stats Display
     if args.stats || config.ui.stats_interval.is_some() {
         let interval = config.ui.stats_interval.unwrap_or(10);
         start_stats_display(stats.clone(), interval);
     }
 
-    // 7. Start Proxy Server with Ctrl+C graceful shutdown
+    // 8. Start Proxy Server with Ctrl+C graceful shutdown
     let server_cfg = ServerConfig {
         bind_addr,
         strategy,
@@ -240,9 +275,31 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
         _ = tokio::signal::ctrl_c() => {
             println!("\n{}", "Received shutdown signal (Ctrl+C). Terminating EvadeDPI gracefully.".yellow());
         }
+        _ = wait_for_terminate() => {
+            println!("\n{}", "Received SIGTERM. Terminating EvadeDPI gracefully.".yellow());
+        }
+    }
+
+    if let Some(mut guard) = proxy_guard.take() {
+        guard.restore();
     }
 
     Ok(())
+}
+
+#[cfg(unix)]
+async fn wait_for_terminate() {
+    match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        Ok(mut s) => {
+            s.recv().await;
+        }
+        Err(_) => std::future::pending::<()>().await,
+    }
+}
+
+#[cfg(not(unix))]
+async fn wait_for_terminate() {
+    std::future::pending::<()>().await
 }
 
 fn print_presets() {

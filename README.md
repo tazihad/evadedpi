@@ -155,11 +155,11 @@ Pre-compiled, standalone binaries are packaged with high-efficiency `.tar.xz` co
 #### Option A: One-Liner Download & Extract (Linux x86_64)
 
 ```bash
-# Download the latest v0.2.0 release archive
-curl -sLO https://github.com/tazihad/evadedpi/releases/download/v0.2.0/evadedpi-v0.2.0-linux-x86_64.tar.xz
+# Download the latest v0.3.0 release archive
+curl -sLO https://github.com/tazihad/evadedpi/releases/download/v0.3.0/evadedpi-v0.3.0-linux-x86_64.tar.xz
 
 # Extract the archive
-tar -xJf evadedpi-v0.2.0-linux-x86_64.tar.xz
+tar -xJf evadedpi-v0.3.0-linux-x86_64.tar.xz
 
 # (Optional) Install system-wide to /usr/local/bin
 sudo install -m 755 evadedpi /usr/local/bin/
@@ -227,7 +227,7 @@ Output:
  | |____\ V / (_| | (_| |  __/ |__| | |    _| |_ 
  |______|\_/ \__,_|\__,_|\___|_____/|_|   |_____|
 
-   EvadeDPI v0.2.0 by tazihad - Deep Packet Inspection Evasion Suite
+   EvadeDPI v0.3.0 by tazihad - Deep Packet Inspection Evasion Suite
    Written in Rust. Cross-Platform SOCKS5 & HTTP Proxy
 
 ╭─── Active Configuration ─────────────────────────────────────╮
@@ -310,7 +310,7 @@ Example Output:
 [1/4] Checking DNS Resolution... OK
       System DNS: ["142.250.182.238"]
       DoH (Cloudflare): ["142.250.122.102", "142.250.122.139"]
-[2/4] Testing Direct TLS Handshake (No Evasion)... PASS (104ms)
+[2/4] Testing Direct TLS Handshake (No Evasion)... RESET (DPI RST)
 [3/4] Benchmarking Circumvention Strategies against Middlebox:
       Testing SNI Segmentation (Recommended)     ... PASS (145ms)
       Testing First-Byte Split (1 + remainder)   ... PASS (102ms)
@@ -319,8 +319,25 @@ Example Output:
       Testing Disorder (Reverse Segment Order)   ... PASS (216ms)
       Testing Fake Decoy SNI (Low TTL)           ... PASS (1093ms)
 [4/4] Summary & Recommendations:
-  ==> SUCCESS: DPI bypass confirmed working on this network!
+==========================================================
+[!] DPI Censorship Confirmed on 'youtube.com'!
+    Direct connection was blocked/reset by ISP middlebox. Circumvention is required.
+    Recommended strategy: First-Byte Split (1 + remainder) (102ms, fastest reliable option)
+----------------------------------------------------------
+>>> RECOMMENDED COMMAND TO UNBLOCK 'YOUTUBE.COM':
+
+    evadedpi --preset first-byte --system-proxy
+
+  Alternative run modes:
+    • Standalone proxy (configure browser or app manually to 127.0.0.1:1080):
+      evadedpi --preset first-byte
+
+    • Apply circumvention ONLY to 'youtube.com' (other traffic direct):
+      evadedpi --preset first-byte --rules "youtube.com,*.youtube.com" --scope allowlist --system-proxy
+==========================================================
 ```
+
+> If evadedpi is force-killed (e.g. `kill -9`) while `--system-proxy` is active, run `evadedpi reset-proxy` to turn the OS proxy back off.
 
 ---
 
@@ -347,6 +364,7 @@ Commands:
   run              Start the EvadeDPI proxy server (default command)
   test             Probe a website to test censorship and benchmark circumvention techniques
   presets          List all built-in circumvention presets and their characteristics
+  reset-proxy      Disable the OS system proxy (recovery if evadedpi was force-killed)
   generate-config  Generate a documented configuration file template (evadedpi.toml)
   completions      Generate shell auto-completions for your shell
   help             Print this message or the help of the given subcommand(s)
@@ -354,6 +372,8 @@ Commands:
 Options:
   -b, --bind <BIND>              IP address to bind [default: 127.0.0.1]
   -p, --port <PORT>              Port to listen on [default: 1080]
+  -S, --system-proxy             Set the OS system proxy while running; restored on exit
+                                 (GNOME/gsettings, KDE Plasma, macOS, Windows)
       --preset <PRESET>          Evasion preset profile [default: general]
                                  [values: general, first-byte, russia, iran, china, turkey, discord-youtube, extreme]
   -s, --split-mode <SPLIT_MODE>  Splitting mode [default: sni]

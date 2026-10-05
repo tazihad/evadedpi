@@ -49,6 +49,7 @@ pub struct DiagnosticReport {
     pub dns_tampered: bool,
     pub direct_result: ProbeResult,
     pub strategy_results: Vec<(String, ProbeResult)>,
+    pub recommended_command: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -129,52 +130,71 @@ pub async fn run_diagnostic(domain: &str) -> Result<DiagnosticReport> {
     // 3. Evasion Strategies Test
     println!("[3/4] Benchmarking Circumvention Strategies against Middlebox:");
 
-    let strategies = vec![
-        (
-            "SNI Segmentation (Recommended)",
-            EvasionStrategy {
+    struct StrategyCandidate {
+        name: &'static str,
+        preset: Option<&'static str>,
+        cli_args: &'static str,
+        strategy: EvasionStrategy,
+    }
+
+    let candidates = vec![
+        StrategyCandidate {
+            name: "SNI Segmentation (Recommended)",
+            preset: Some("general"),
+            cli_args: "--preset general",
+            strategy: EvasionStrategy {
                 split_mode: SplitMode::Sni,
                 delay_ms: 5,
                 ..Default::default()
             },
-        ),
-        (
-            "First-Byte Split (1 + remainder)",
-            EvasionStrategy {
+        },
+        StrategyCandidate {
+            name: "First-Byte Split (1 + remainder)",
+            preset: Some("first-byte"),
+            cli_args: "--preset first-byte",
+            strategy: EvasionStrategy {
                 split_mode: SplitMode::FirstByte,
                 delay_ms: 5,
                 ..Default::default()
             },
-        ),
-        (
-            "Small Chunks (20-byte chunks)",
-            EvasionStrategy {
+        },
+        StrategyCandidate {
+            name: "Small Chunks (20-byte chunks)",
+            preset: None,
+            cli_args: "--split-mode chunk --chunk-size 20 --delay-ms 3",
+            strategy: EvasionStrategy {
                 split_mode: SplitMode::Chunk,
                 chunk_size: 20,
                 delay_ms: 3,
                 ..Default::default()
             },
-        ),
-        (
-            "TLS Record Layer Split",
-            EvasionStrategy {
+        },
+        StrategyCandidate {
+            name: "TLS Record Layer Split",
+            preset: None,
+            cli_args: "--tlsrec --delay-ms 5",
+            strategy: EvasionStrategy {
                 tls_record_split: true,
                 delay_ms: 5,
                 ..Default::default()
             },
-        ),
-        (
-            "Disorder (Reverse Segment Order)",
-            EvasionStrategy {
+        },
+        StrategyCandidate {
+            name: "Disorder (Reverse Segment Order)",
+            preset: None,
+            cli_args: "--split-mode sni --disorder --delay-ms 5",
+            strategy: EvasionStrategy {
                 split_mode: SplitMode::Sni,
                 disorder: true,
                 delay_ms: 5,
                 ..Default::default()
             },
-        ),
-        (
-            "Fake Decoy SNI (Low TTL)",
-            EvasionStrategy {
+        },
+        StrategyCandidate {
+            name: "Fake Decoy SNI (Low TTL)",
+            preset: None,
+            cli_args: "--fake --fake-ttl 4 --delay-ms 5",
+            strategy: EvasionStrategy {
                 enable_fake: true,
                 fake_sni: "www.microsoft.com".to_string(),
                 fake_ttl: 4,
@@ -182,60 +202,164 @@ pub async fn run_diagnostic(domain: &str) -> Result<DiagnosticReport> {
                 delay_ms: 5,
                 ..Default::default()
             },
-        ),
-        (
-            "Mid-SNI Split (Split inside SNI)",
-            EvasionStrategy {
+        },
+        StrategyCandidate {
+            name: "Mid-SNI Split (Split inside SNI)",
+            preset: None,
+            cli_args: "--split-mode mid-sni --delay-ms 5",
+            strategy: EvasionStrategy {
                 split_mode: SplitMode::MidSni,
                 delay_ms: 5,
                 ..Default::default()
             },
-        ),
-        (
-            "MultiSplit (3-chunk SNI split)",
-            EvasionStrategy {
+        },
+        StrategyCandidate {
+            name: "MultiSplit (3-chunk SNI split)",
+            preset: None,
+            cli_args: "--split-mode multisplit --delay-ms 5",
+            strategy: EvasionStrategy {
                 split_mode: SplitMode::MultiSplit,
                 delay_ms: 5,
                 ..Default::default()
             },
-        ),
-        (
-            "Mixed SNI Casing + MultiSplit",
-            EvasionStrategy {
+        },
+        StrategyCandidate {
+            name: "Mixed SNI Casing + MultiSplit",
+            preset: None,
+            cli_args: "--split-mode multisplit --mix-sni --delay-ms 5",
+            strategy: EvasionStrategy {
                 split_mode: SplitMode::MultiSplit,
                 mix_sni: true,
                 delay_ms: 5,
                 ..Default::default()
             },
-        ),
+        },
     ];
 
     let mut strategy_results = Vec::new();
-    for (name, strat) in strategies {
-        print!("      Testing {:<34} ... ", name);
-        let res = probe_tls_connection(domain, target_addr, Some(strat)).await;
+    let mut successes: Vec<(&StrategyCandidate, u128)> = Vec::new();
+
+    for candidate in &candidates {
+        print!("      Testing {:<34} ... ", candidate.name);
+        let res = probe_tls_connection(domain, target_addr, Some(candidate.strategy.clone())).await;
         println!("{}", res);
-        strategy_results.push((name.to_string(), res));
+        if let ProbeResult::Success { latency_ms } = res {
+            successes.push((candidate, latency_ms));
+        }
+        strategy_results.push((candidate.name.to_string(), res));
     }
 
-    println!("[4/4] Summary & Recommendations:");
-    let any_success = strategy_results
-        .iter()
-        .any(|(_, r)| matches!(r, ProbeResult::Success { .. }));
+    println!("\n[4/4] Summary & Recommendations:");
+    let recommended_command = if !successes.is_empty() {
+        // Sort successes by latency
+        successes.sort_by_key(|s| s.1);
 
-    if any_success {
+        // Pick best candidate: prefer general or first-byte if they are within 30ms of fastest
+        let fastest_latency = successes[0].1;
+        let best_candidate = successes
+            .iter()
+            .find(|(c, lat)| {
+                (c.preset == Some("general") || c.preset == Some("first-byte"))
+                    && (*lat <= fastest_latency + 30)
+            })
+            .map(|(c, _)| *c)
+            .unwrap_or(successes[0].0);
+
+        let best_latency = successes
+            .iter()
+            .find(|(c, _)| c.name == best_candidate.name)
+            .map(|(_, lat)| *lat)
+            .unwrap_or(fastest_latency);
+
+        let direct_blocked = matches!(direct_result, ProbeResult::Reset | ProbeResult::Timeout | ProbeResult::Error(_));
+
+        println!("{}", "==========================================================".cyan());
+        if direct_blocked {
+            println!(
+                "{} {}",
+                "[!]".bold().red(),
+                format!("DPI Censorship Confirmed on '{}'!", domain).bold().red()
+            );
+            println!(
+                "    Direct connection was blocked/reset by ISP middlebox. Circumvention is required."
+            );
+        } else {
+            println!(
+                "{} {}",
+                "[*]".bold().green(),
+                format!("'{}' is reachable directly; DPI bypass also works.", domain).bold().green()
+            );
+            println!(
+                "    No active censorship detected (direct: {}). EvadeDPI is optional here.",
+                direct_result
+            );
+        }
+
+        println!(
+            "    Recommended strategy: {} ({}ms, fastest reliable option)",
+            best_candidate.name.bold().green(),
+            best_latency.to_string().bold().yellow()
+        );
+        println!("{}", "----------------------------------------------------------".cyan());
         println!(
             "{}",
-            "  ==> SUCCESS: DPI bypass confirmed working on this network!".bold().green()
+            format!(">>> RECOMMENDED COMMAND TO UNBLOCK '{}':", domain.to_uppercase())
+                .bold()
+                .yellow()
         );
+        println!();
+        println!(
+            "    {}",
+            format!("evadedpi {} --system-proxy", best_candidate.cli_args)
+                .bold()
+                .green()
+        );
+        println!();
+        println!("  Alternative run modes:");
+        println!(
+            "    • Standalone proxy (configure browser or app manually to 127.0.0.1:1080):"
+        );
+        println!(
+            "      {}",
+            format!("evadedpi {}", best_candidate.cli_args).cyan()
+        );
+        println!();
+        println!(
+            "    • Apply circumvention ONLY to '{}' (other traffic direct):",
+            domain
+        );
+        println!(
+            "      {}",
+            format!("evadedpi {} --rules \"{},*.{}\" --scope allowlist --system-proxy", best_candidate.cli_args, domain, domain).cyan()
+        );
+
+        if dns_tampered {
+            println!();
+            println!(
+                "  {} DNS poisoning detected on this network. EvadeDPI's built-in DoH",
+                "Note:".bold().yellow()
+            );
+            println!("        resolves untampered IP addresses for this site automatically.");
+        }
+
+        println!("{}", "==========================================================".cyan());
+
+        Some(format!("evadedpi {} --system-proxy", best_candidate.cli_args))
     } else {
+        println!("{}", "==========================================================".cyan());
         println!(
             "{}",
             "  ==> All tested strategies failed. The IP itself may be blocked or network down."
                 .bold()
                 .red()
         );
-    }
+        println!(
+            "      Target domain '{}' may be completely unreachable from this network.",
+            domain
+        );
+        println!("{}", "==========================================================".cyan());
+        None
+    };
 
     Ok(DiagnosticReport {
         target_domain: domain.to_string(),
@@ -244,6 +368,7 @@ pub async fn run_diagnostic(domain: &str) -> Result<DiagnosticReport> {
         dns_tampered,
         direct_result,
         strategy_results,
+        recommended_command,
     })
 }
 

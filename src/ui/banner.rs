@@ -64,6 +64,7 @@ pub fn print_startup_summary(
     strategy: &EvasionStrategy,
     doh_endpoint: Option<&str>,
     rules_count: usize,
+    system_proxy_active: bool,
 ) {
     println!("{}", "╭─── Active Configuration ─────────────────────────────────────╮".cyan());
     println!(
@@ -75,6 +76,15 @@ pub fn print_startup_summary(
         "│ {} {:<47} │",
         "Active Profile:  ".bold().white(),
         preset_name.yellow().bold()
+    );
+    println!(
+        "│ {} {:<47} │",
+        "System Proxy:    ".bold().white(),
+        if system_proxy_active {
+            "Enabled (Auto-configured)".green().bold()
+        } else {
+            "Disabled (Use --system-proxy)".dimmed()
+        }
     );
     println!(
         "│ {} {:<47} │",
@@ -143,13 +153,24 @@ pub fn print_startup_summary(
         }
     );
     println!("{}", "╰──────────────────────────────────────────────────────────────╯".cyan());
-    println!(
-        "\n{} EvadeDPI is running. Configure your system or browser proxy to:",
-        "[*Ready*]".bold().green()
-    );
-    println!("          Host: {}", bind_addr.ip().to_string().bold().yellow());
-    println!("          Port: {}", bind_addr.port().to_string().bold().yellow());
-    println!("          Type: HTTP or SOCKS5 (Both automatically supported)\n");
+
+    if system_proxy_active {
+        println!(
+            "\n{} System proxy is actively managing OS network routes.",
+            "[*Ready*]".bold().green()
+        );
+        println!("          All browsers & applications automatically route through EvadeDPI.");
+        println!("          Settings will be restored cleanly on exit (Ctrl+C).\n");
+    } else {
+        println!(
+            "\n{} EvadeDPI is running. Configure your system or browser proxy to:",
+            "[*Ready*]".bold().green()
+        );
+        println!("          Host: {}", bind_addr.ip().to_string().bold().yellow());
+        println!("          Port: {}", bind_addr.port().to_string().bold().yellow());
+        println!("          Type: HTTP or SOCKS5 (Both automatically supported)");
+        println!("          (Tip: Run with --system-proxy to automatically set OS proxy)\n");
+    }
 }
 
 /// Spawns a background task that displays periodic statistics if enabled.
