@@ -4,10 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
 
-> **EvadeDPI** is a modern, high-performance Deep Packet Inspection (DPI) circumvention suite written in pure Rust. It combines the most effective packet manipulation, segmentation, decoy injection, and transport desynchronization techniques inspired by leading anti-censorship projects into a unified, cross-platform CLI tool.
+> **EvadeDPI** is a modern, high-performance Deep Packet Inspection (DPI) circumvention suite written in pure Rust. It combines the most effective packet manipulation, segmentation, decoy injection, and transport desynchronization techniques into a unified, cross-platform CLI tool.
 
 📖 **Comprehensive Documentation**: Complete guides are available in the [`docs/`](docs/) directory:
-- [Architecture & Lineage](docs/architecture.md)
+- [Architecture & Design](docs/architecture.md)
 - [Evasion Techniques Deep Dive](docs/techniques.md)
 - [CLI Reference Manual](docs/cli-reference.md)
 - [Configuration Guide](docs/configuration.md)
@@ -18,9 +18,7 @@
 
 ## 📑 Table of Contents
 
-- [Deep Packet Inspection Analysis & Lineage](#-deep-packet-inspection-analysis--lineage)
-  - [Analysis of Existing Tools](#analysis-of-existing-tools)
-  - [Comparison Matrix](#comparison-matrix)
+- [Deep Packet Inspection Overview](#-deep-packet-inspection-overview)
 - [How EvadeDPI Works](#-how-evadedpi-works)
   - [1. Dual-Protocol Unified Proxy](#1-dual-protocol-unified-proxy)
   - [2. TLS ClientHello & SNI Segmentation](#2-tls-clienthello--sni-segmentation)
@@ -41,59 +39,13 @@
 
 ---
 
-## 🔍 Deep Packet Inspection Analysis & Lineage
+## 🔍 Deep Packet Inspection Overview
 
 Deep Packet Inspection (DPI) systems used by Internet Service Providers (ISPs) and state-level firewalls (such as Russia's TSPU / RKN, China's GFW, Iran, Turkey, and university/corporate firewalls) inspect plaintext fields in network traffic:
 1. **Plaintext DNS Queries (UDP Port 53)**: Hijacked or poisoned with fake IP addresses (redirecting to blockpages or `127.0.0.1`).
 2. **TLS ClientHello SNI (Server Name Indication)**: Inspected during the TLS handshake before encryption is established. If the SNI matches a blacklist, the middlebox injects a TCP RST or silently drops packets.
 3. **HTTP `Host` Headers**: Inspected in plaintext HTTP/1.1 traffic.
 4. **QUIC / HTTP/3 (UDP Port 443)**: Encrypted transport that cannot be easily segmented; middleboxes often block UDP 443 entirely or inspect initial QUIC frames.
-
-### Analysis of Existing Tools
-
-* **[GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI) (C / WinDivert / Windows)**:
-  - Operates at the network driver level using WinDivert.
-  - Pioneers HTTP header tricks (replace `Host` with `hoSt`, remove space after colon, insert spaces before URI) and TLS ClientHello fragmentation.
-  - Introduces fake packet injection with low TTL or bad TCP checksums, passive DPI blocking, and QUIC blocking.
-  - *Limitation*: Windows-only; requires driver installation and Administrator privileges.
-
-* **[ByeDPI / ciadpi](https://github.com/hufrea/byedpi) (C / SOCKS5 & Transparent / Multi-platform)**:
-  - Extremely versatile local proxy.
-  - Introduces flexible split positioning (`--split 1+s` / `+sm`), TLS record layer splitting (`--tlsrec`), TCP out-of-band injection (`--oob`), and disordering (`--disorder`).
-  - *Limitation*: Command-line syntax can be esoteric for beginners; written in C without modern async concurrency.
-
-* **[SpoofDPI](https://github.com/xvzc/SpoofDPI) (Go / HTTP & SOCKS Proxy)**:
-  - Lightweight proxy that focuses on clean TLS ClientHello parsing and SNI-based segmentation (first-byte, SNI offset, chunks).
-  - Integrates DNS-over-HTTPS (DoH) and fake packet injection.
-  - *Limitation*: Limited record-layer manipulation and HTTP mutation options.
-
-* **[DPIBreak](https://github.com/dilluti0n/dpibreak) (Rust / NFQUEUE & WinDivert)**:
-  - Implements packet-level ClientHello segmentation in Rust with segment ordering (e.g. `-o 0,1` or `-o 0,5`) and auto-TTL calculation.
-  - *Limitation*: Requires kernel NFQUEUE configuration / root on Linux, or WinDivert on Windows.
-
-* **[GreenTunnel](https://github.com/SadeghHayeri/GreenTunnel) (Node.js)** & **[PowerTunnel](https://github.com/krlvm/PowerTunnel) (Java)**:
-  - Application-level proxies utilizing LittleProxy or Node.js streams.
-  - Provided early proofs of concept for SNI splitting and DoH integration, but carry runtime overhead of Node.js / Java.
-
-* **[Zapret](https://github.com/bol-van/zapret) (C / nfqws / tpws)**:
-  - Comprehensive suite for Linux routers / OpenWrt featuring multi-split, disorder, badsum, syndata, and ipfrag.
-
-### Comparison Matrix
-
-| Feature | GoodbyeDPI | ByeDPI | SpoofDPI | DPIBreak | **EvadeDPI (`evadedpi`)** |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Language** | C | C | Go | Rust | **Rust (1.75+)** |
-| **Cross-Platform (No Drivers Required)** | ❌ (Win only) | ✅ | ✅ | ❌ (Kernel hooks) | **✅ (Linux, macOS, Windows)** |
-| **Unified Proxy (SOCKS5 + HTTP on 1 Port)** | ❌ | ❌ | ❌ | ❌ | **✅ Auto-detecting Single Listener** |
-| **SNI-Aware Segmentation** | ✅ | ✅ | ✅ | ✅ | **✅ (Exact offset, before & mid-SNI)** |
-| **TLS Record Fragmentation (`--tlsrec`)** | ❌ | ✅ | ❌ | ❌ | **✅ RFC-Compliant Split** |
-| **Decoy / Fake Packet Injection** | ✅ | ✅ | ✅ | ✅ | **✅ Realistic Handshake + Low TTL** |
-| **TCP Disordering / Reverse Order** | ✅ | ✅ | ❌ | ✅ | **✅ Configurable Disordering** |
-| **TCP Out-Of-Band (OOB) Injection** | ❌ | ✅ | ❌ | ❌ | **✅ Supported (`--oob`)** |
-| **HTTP Casing & Space Mutations** | ✅ | ✅ | ❌ | ❌ | **✅ `hoSt:`, spacing, newlines** |
-| **DNS-over-HTTPS (DoH) + Local Cache** | ❌ | ❌ | ✅ | ❌ | **✅ Cloudflare, Google, Quad9, Custom** |
-| **Censorship Diagnostic Probe** | ❌ | ❌ | ❌ | ❌ | **✅ Built-in (`evadedpi test`)** |
-| **Presets (Russia, Iran, China, Turkey)** | Profiles in .cmd | ❌ | ❌ | ❌ | **✅ One-Flag Presets (`--preset`)** |
 
 ---
 

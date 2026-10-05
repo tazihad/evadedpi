@@ -81,7 +81,7 @@ evadedpi test blocked-site.com
 ---
 
 ### "Address already in use (os error 98)"
-Another service (such as another proxy or ByeDPI instance) is already using port 1080.
+Another service or previous proxy process is already using port 1080.
 - *Fix*: Bind to another port using `-p`:
   ```bash
   evadedpi -p 1088

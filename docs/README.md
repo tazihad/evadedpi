@@ -6,10 +6,10 @@ Welcome to the official documentation for **EvadeDPI** (`evadedpi`), a modern, h
 
 ## 🗂️ Documentation Sections
 
-1. [**Architecture & Lineage**](architecture.md)
-   - Detailed analysis of existing tools: GoodbyeDPI, ByeDPI, SpoofDPI, DPIBreak, GreenTunnel, PowerTunnel, Zapret
-   - Kernel-level packet filtering vs. Application-level proxy architecture
+1. [**Architecture & Design**](architecture.md)
    - Core design and subsystem breakdown of EvadeDPI
+   - User-space proxy vs. Kernel-level driver architecture
+   - Unified multi-protocol listener and flow pipeline
 
 2. [**Evasion Techniques Deep Dive**](techniques.md)
    - TLS ClientHello SNI segmentation mechanics

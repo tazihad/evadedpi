@@ -114,7 +114,7 @@ TCP allows transmitting urgent data with the `MSG_OOB` flag set, pointing the TC
 
 ## 6. HTTP/1.1 Header Mutations
 
-For unencrypted HTTP connections, EvadeDPI supports classic GoodbyeDPI and ByeDPI mutations:
+For unencrypted HTTP connections, EvadeDPI supports classic HTTP/1.1 evasion mutations:
 1. **`mix_host`**: Mutates the case of the header name:
    `Host: example.com` ➔ `hoSt: example.com`
    (RFC 2616 / RFC 7230 states header names are case-insensitive; middlebox string matchers often look strictly for `Host:`).
@@ -151,7 +151,7 @@ EvadeDPI includes an asynchronous DoH client that queries trusted encrypted reso
 
 Standard SNI splitting cuts the ClientHello at the exact start of the SNI domain string. Some modern DPI systems (such as updated TSPU boxes) have adapted by looking for ClientHello continuation fragments that begin with domain names.
 
-EvadeDPI introduces advanced mid-SNI segmentation inspired by Zapret:
+EvadeDPI introduces advanced mid-SNI segmentation:
 1. **Mid-SNI (`--split-mode mid-sni`)**:
    Calculates the exact byte midpoint of the target domain string and splits right in the middle (e.g. `yout` in packet 1, and `ube.com` in packet 2). Neither segment matches domain patterns or starts with a valid hostname string.
 2. **MultiSplit (`--split-mode multisplit`)**:
