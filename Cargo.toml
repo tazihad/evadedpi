@@ -6,7 +6,7 @@ authors = ["tazihad <@tazihad>"]
 license = "MIT"
 repository = "https://github.com/tazihad/evadedpi"
 homepage = "https://zihad.com.bd"
-description = "Next-generation Deep Packet Inspection (DPI) circumvention tool and cross-platform proxy by tazihad"
+description = "Next-generation Deep Packet Inspection (DPI) circumvention tool and cross-platform proxy"
 
 [dependencies]
 anyhow = "1.0.104"

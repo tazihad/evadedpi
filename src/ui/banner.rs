@@ -54,8 +54,7 @@ pub fn print_banner() {
         "tazihad".bold().green()
     );
     println!(
-        "   Written in Rust by {}. Cross-Platform SOCKS5 & HTTP Proxy\n",
-        "tazihad".bold().green()
+        "   Written in Rust. Cross-Platform SOCKS5 & HTTP Proxy\n"
     );
 }
 

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
 
-> **EvadeDPI** is a modern, high-performance Deep Packet Inspection (DPI) circumvention suite written in pure Rust by tazihad. It combines the most effective packet manipulation, segmentation, decoy injection, and transport desynchronization techniques inspired by leading anti-censorship projects into a unified, cross-platform CLI tool.
+> **EvadeDPI** is a modern, high-performance Deep Packet Inspection (DPI) circumvention suite written in pure Rust. It combines the most effective packet manipulation, segmentation, decoy injection, and transport desynchronization techniques inspired by leading anti-censorship projects into a unified, cross-platform CLI tool.
 
 📖 **Comprehensive Documentation**: Complete guides are available in the [`docs/`](docs/) directory:
 - [Architecture & Lineage](docs/architecture.md)
@@ -228,7 +228,7 @@ Output:
  |______|\_/ \__,_|\__,_|\___|_____/|_|   |_____|
 
    EvadeDPI v0.2.0 by tazihad - Deep Packet Inspection Evasion Suite
-   Written in Rust by tazihad. Cross-Platform SOCKS5 & HTTP Proxy
+   Written in Rust. Cross-Platform SOCKS5 & HTTP Proxy
 
 ╭─── Active Configuration ─────────────────────────────────────╮
 │ Listen Address:   http/socks5://127.0.0.1:1080               │
