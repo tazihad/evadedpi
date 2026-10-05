@@ -2,6 +2,11 @@
 name = "evadedpi"
 version = "0.2.0"
 edition = "2024"
+authors = ["tazihad <@tazihad>"]
+license = "MIT"
+repository = "https://github.com/tazihad/evadedpi"
+homepage = "https://zihad.com.bd"
+description = "Next-generation Deep Packet Inspection (DPI) circumvention tool and cross-platform proxy by tazihad"
 
 [dependencies]
 anyhow = "1.0.104"

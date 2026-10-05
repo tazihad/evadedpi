@@ -1,10 +1,10 @@
 # 🛡️ EvadeDPI (`evadedpi`)
 
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange?logo=rust)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/License-MIT%2FApache--2.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
 
-> **EvadeDPI** is a modern, high-performance Deep Packet Inspection (DPI) circumvention suite written in pure Rust. It combines the most effective packet manipulation, segmentation, decoy injection, and transport desynchronization techniques inspired by leading anti-censorship projects into a unified, cross-platform CLI tool.
+> **EvadeDPI** is a modern, high-performance Deep Packet Inspection (DPI) circumvention suite written in pure Rust by tazihad. It combines the most effective packet manipulation, segmentation, decoy injection, and transport desynchronization techniques inspired by leading anti-censorship projects into a unified, cross-platform CLI tool.
 
 📖 **Comprehensive Documentation**: Complete guides are available in the [`docs/`](docs/) directory:
 - [Architecture & Lineage](docs/architecture.md)
@@ -227,8 +227,8 @@ Output:
  | |____\ V / (_| | (_| |  __/ |__| | |    _| |_ 
  |______|\_/ \__,_|\__,_|\___|_____/|_|   |_____|
 
-   EvadeDPI v0.2.0 - Deep Packet Inspection Evasion Suite
-   Written in Rust. Cross-Platform SOCKS5 & HTTP Proxy
+   EvadeDPI v0.2.0 by tazihad - Deep Packet Inspection Evasion Suite
+   Written in Rust by tazihad. Cross-Platform SOCKS5 & HTTP Proxy
 
 ╭─── Active Configuration ─────────────────────────────────────╮
 │ Listen Address:   http/socks5://127.0.0.1:1080               │
@@ -412,8 +412,6 @@ curl -I https://www.google.com
 
 ## 📜 License
 
-Licensed under either of:
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+This project is licensed under the [MIT License](LICENSE).
 
-at your option.
+Copyright (c) 2024-2026 Tazihad ([@tazihad](https://github.com/tazihad)).

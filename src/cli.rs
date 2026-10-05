@@ -35,10 +35,10 @@ use clap_complete::Shell;
 #[derive(Parser, Debug)]
 #[command(
     name = "evadedpi",
-    author = "EvadeDPI Contributors",
+    author = "tazihad (@tazihad)",
     version,
     about = "Next-generation Deep Packet Inspection (DPI) circumvention tool and cross-platform proxy",
-    long_about = "EvadeDPI (evadedpi) is a modern, high-performance DPI circumvention suite written in Rust.\n\
+    long_about = "EvadeDPI (evadedpi) is a modern, high-performance DPI circumvention suite written in Rust by tazihad.\n\
 It intercepts and desynchronizes TLS ClientHello and HTTP requests via SNI segmentation, fake packet injection, \
 disordering, TLS record splitting, and DNS-over-HTTPS (DoH) to defeat stateful and stateless DPI firewalls."
 )]

@@ -48,12 +48,14 @@ pub fn print_banner() {
 "#;
     println!("{}", logo.bold().cyan());
     println!(
-        "   {} v{} - Deep Packet Inspection Evasion Suite",
+        "   {} v{} by {} - Deep Packet Inspection Evasion Suite",
         "EvadeDPI".bold().yellow(),
-        env!("CARGO_PKG_VERSION").bold().white()
+        env!("CARGO_PKG_VERSION").bold().white(),
+        "tazihad".bold().green()
     );
     println!(
-        "   Written in Rust. Cross-Platform SOCKS5 & HTTP Proxy\n"
+        "   Written in Rust by {}. Cross-Platform SOCKS5 & HTTP Proxy\n",
+        "tazihad".bold().green()
     );
 }
 
