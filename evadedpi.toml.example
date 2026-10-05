@@ -6,13 +6,18 @@
 bind = "127.0.0.1"
 # Port for the unified SOCKS5 and HTTP/HTTPS proxy listener
 port = 1080
+# Connection idle timeout in seconds (reaps dead/abandoned tunnels)
+idle_timeout_secs = 120
 
 [evasion]
-# Pre-configured profile: "general", "first-byte", "russia", "iran", "china", "turkey", "extreme"
+# Pre-configured profile: "general", "first-byte", "russia", "iran", "china", "turkey", "discord-youtube", "extreme"
 preset = "general"
 
-# Splitting mode: "sni", "first-byte", "chunk", "random", "custom", "none"
+# Splitting mode: "sni", "mid-sni", "multisplit", "first-byte", "chunk", "random", "custom", "none"
 split_mode = "sni"
+
+# Randomize SNI hostname casing (RFC 6066 case-insensitive) to bypass case-sensitive DPI middleboxes
+mix_sni = false
 
 # Chunk size in bytes when split_mode = "chunk"
 chunk_size = 40

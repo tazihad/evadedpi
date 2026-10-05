@@ -135,3 +135,36 @@ Many censorship events begin with DNS hijacking:
 - The ISP intercepts plaintext UDP port 53 DNS queries and returns forged IP addresses (e.g. `127.0.0.1`, `0.0.0.0`, or a government notice server).
 
 EvadeDPI includes an asynchronous DoH client that queries trusted encrypted resolvers (Cloudflare `1.1.1.1`, Google `8.8.8.8`, Quad9, or AdGuard) over HTTPS. Resolved IP addresses are cached locally in memory with TTL respect, preventing DNS poisoning before the TCP connection is even initiated.
+
+---
+
+## 9. Mid-SNI Splitting & MultiSplit (`mid-sni`, `multisplit`)
+
+Standard SNI splitting cuts the ClientHello at the exact start of the SNI domain string. Some modern DPI systems (such as updated TSPU boxes) have adapted by looking for ClientHello continuation fragments that begin with domain names.
+
+EvadeDPI introduces advanced mid-SNI segmentation inspired by Zapret:
+1. **Mid-SNI (`--split-mode mid-sni`)**:
+   Calculates the exact byte midpoint of the target domain string and splits right in the middle (e.g. `yout` in packet 1, and `ube.com` in packet 2). Neither segment matches domain patterns or starts with a valid hostname string.
+2. **MultiSplit (`--split-mode multisplit`)**:
+   Partitions the ClientHello across 3 distinct segments:
+   - Fragment 1: Up to the start of the SNI hostname.
+   - Fragment 2: The first half of the SNI hostname.
+   - Fragment 3: The second half of the SNI hostname and the remaining extensions.
+   This defeats multi-packet window reassembly filters.
+
+---
+
+## 10. SNI Casing Randomization (`--mix-sni`)
+
+Under RFC 6066 Section 3, DNS hostnames in the SNI extension are defined as ASCII strings and are strictly case-insensitive.
+However, many hardware DPI middleboxes implement fast substring matching using case-sensitive pattern tables or simple ASCII string lookups for performance reasons.
+
+When `--mix-sni` is enabled, EvadeDPI randomizes the casing of letters within the SNI payload (e.g. `yOuTuBe.cOm` or `dIsCoRd.gG`). Standard TLS servers accept and negotiate the certificate normally, while case-sensitive DPI pattern filters fail to trigger.
+
+---
+
+## 11. Idle Tunnel Reaper & Connection Management
+
+During bidirectional proxy streaming, half-closed sockets, NAT timeouts, or middlebox silent packet drops can cause connections to hang indefinitely. This causes file descriptor leaks and memory accumulation over time.
+
+EvadeDPI implements an automatic **Idle Connection Reaper** (`--idle-timeout 120`). If neither the client nor upstream server transfers data for the configured duration, the tunnel is cleanly shut down and its memory and sockets are reclaimed.

@@ -216,6 +216,7 @@ EvadeDPI includes tuned, battle-tested presets for specific censorship regimes:
 | `general` | **Default balanced mode** | SNI split, 2ms delay, DoH, QUIC blocked. |
 | `first-byte` | **Classic 1-byte split** | 1 byte + remaining handshake. High compatibility. |
 | `russia` | **Optimized for Russian TSPU / RKN** | SNI split + Decoy ClientHello (`--fake-sni www.microsoft.com --fake-ttl 4`) + 4ms delay + DoH. |
+| `discord-youtube` | **Bypass YouTube & Discord throttling** | MultiSplit (3-chunk SNI) + Decoy injection + SNI casing randomization (`--mix-sni`) + QUIC blocked. |
 | `iran` | **Optimized for Iranian DPI** | First-byte split + TLS record layer fragmentation (`--tlsrec`) + 5ms delay + DoH. |
 | `china` | **Optimized for GFW reassembly** | 20-byte chunk segmentation + decoy packet + DoH. |
 | `turkey` | **Optimized for Turkish ISP blocks** | First-byte split + HTTP Host casing & space trickery + DoH. |
@@ -284,18 +285,20 @@ Options:
   -b, --bind <BIND>              IP address to bind [default: 127.0.0.1]
   -p, --port <PORT>              Port to listen on [default: 1080]
       --preset <PRESET>          Evasion preset profile [default: general]
-                                 [values: general, first-byte, russia, iran, china, turkey, extreme]
+                                 [values: general, first-byte, russia, iran, china, turkey, discord-youtube, extreme]
   -s, --split-mode <SPLIT_MODE>  Splitting mode [default: sni]
-                                 [values: sni, first-byte, chunk, random, custom, none]
+                                 [values: sni, mid-sni, multisplit, first-byte, chunk, random, custom, none]
       --chunk-size <BYTES>       Chunk size when split-mode is chunk [default: 40]
   -d, --delay-ms <MS>            Delay between segments in ms [default: 2]
       --disorder                 Send packet segments in reverse order
       --tlsrec                   Split ClientHello across TLS record headers
+      --mix-sni                  Randomize SNI character casing to bypass case-sensitive DPI
       --fake                     Enable fake decoy ClientHello injection
       --fake-sni <HOST>          Decoy SNI for fake packet [default: www.microsoft.com]
       --fake-ttl <TTL>           Time-To-Live for fake decoy packet [default: 4]
       --oob                      Send 1 byte of TCP Out-Of-Band (urgent) data
       --allow-quic               Disable QUIC (UDP 443) blocking
+      --idle-timeout <SECS>      Connection idle timeout in seconds [default: 120]
       --doh <PROVIDER>           DoH provider [default: cloudflare]
                                  [values: cloudflare, google, quad9, adguard, or https URL]
       --no-doh                   Disable DoH (use system DNS)

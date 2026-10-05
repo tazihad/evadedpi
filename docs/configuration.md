@@ -27,20 +27,29 @@ bind = "127.0.0.1"
 # Handles both SOCKS5 and HTTP CONNECT proxy protocols simultaneously.
 port = 1080
 
+# TCP tunnel idle reaper timeout in seconds. Automatically closes dead/hanging tunnels.
+idle_timeout_secs = 120
+
 
 [evasion]
 # Predefined baseline profile:
-# "general", "first-byte", "russia", "iran", "china", "turkey", "extreme"
+# "general", "first-byte", "russia", "iran", "china", "turkey", "discord-youtube", "extreme"
 preset = "general"
 
 # TLS ClientHello splitting mode:
-# - "sni"        : Split precisely around the SNI domain (Recommended)
-# - "first-byte"  : Split 1 byte + remaining handshake
-# - "chunk"       : Split into uniform chunk_size bytes
-# - "random"      : Split into randomized chunk sizes (1-15 bytes)
-# - "custom"      : Split at user-defined byte offsets
-# - "none"        : Raw passthrough without segmentation
+# - "sni"        : Split precisely before the SNI domain (Recommended)
+# - "mid-sni"    : Split right in the middle of the SNI domain string
+# - "multisplit" : Split before and in the middle of the SNI (3 segments)
+# - "first-byte" : Split 1 byte + remaining handshake
+# - "chunk"      : Split into uniform chunk_size bytes
+# - "random"     : Split into randomized chunk sizes (1-15 bytes)
+# - "custom"     : Split at user-defined byte offsets
+# - "none"       : Raw passthrough without segmentation
 split_mode = "sni"
+
+# Randomize letter casing within the SNI hostname (RFC 6066 case-insensitive)
+# Evades middleboxes relying on exact case-sensitive string matching
+mix_sni = false
 
 # Chunk size in bytes when split_mode = "chunk"
 chunk_size = 40
@@ -122,6 +131,10 @@ EvadeDPI includes tuned presets for common censorship deployments:
 ### `russia`
 - **Settings**: SNI split + Decoy ClientHello injection (`www.microsoft.com`, TTL=4) + 4ms delay + DoH + QUIC blocked.
 - **Intended Use**: Russian ISPs equipped with TSPU hardware (RKN) which inspect stateful flows.
+
+### `discord-youtube`
+- **Settings**: MultiSplit (3-chunk SNI) + Decoy ClientHello injection (`www.google.com`, TTL=4) + SNI casing randomization (`--mix-sni`) + QUIC blocked.
+- **Intended Use**: Evades middlebox throttling and DPI signature blocking targeted at Discord and YouTube (`googlevideo.com`, `discord.gg`).
 
 ### `iran`
 - **Settings**: First-byte split + TLS record layer fragmentation (`--tlsrec`) + 5ms delay + DoH.

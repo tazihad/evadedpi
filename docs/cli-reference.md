@@ -76,23 +76,32 @@ evadedpi completions bash > /etc/bash_completion.d/evadedpi
   - *Default*: `1080`
   - *Example*: `-p 8080`
 
+* **`--idle-timeout <SECS>`**
+  - TCP tunnel idle reaper timeout in seconds. Automatically terminates abandoned or hanging connections to prevent resource leaks.
+  - *Default*: `120`
+
 ### Evasion Options
 
 * **`--preset <NAME>`**
   - Selects a predefined profile optimized for specific censorship patterns.
-  - *Values*: `general`, `first-byte`, `russia`, `iran`, `china`, `turkey`, `extreme`
+  - *Values*: `general`, `first-byte`, `russia`, `iran`, `china`, `turkey`, `discord-youtube`, `extreme`
   - *Default*: `general`
 
 * **`-s, --split-mode <MODE>`**
   - Specifies the segmentation strategy for the TLS ClientHello.
   - *Values*:
-    - `sni`: Splits right at the SNI domain boundary (Recommended).
+    - `sni`: Splits right at the SNI domain boundary (Recommended default).
+    - `mid-sni`: Splits right in the middle of the SNI domain string.
+    - `multisplit`: Splits before and in the middle of the SNI into 3 distinct segments.
     - `first-byte`: Splits 1 byte into packet 1, remainder into packet 2.
     - `chunk`: Slices payload into uniform chunks.
     - `random`: Slices payload into randomized chunk sizes (1–15 bytes).
     - `custom`: Uses offsets supplied in configuration.
     - `none`: Disables segmentation (raw passthrough).
   - *Default*: `sni`
+
+* **`--mix-sni`**
+  - Randomizes letter casing within the SNI hostname (e.g. `yOuTuBe.cOm`). Compliant with RFC 6066 case-insensitivity while evading case-sensitive DPI string matchers.
 
 * **`--chunk-size <BYTES>`**
   - Size of each chunk in bytes when `--split-mode chunk` is active.
