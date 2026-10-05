@@ -1,0 +1,5 @@
+target/
+.git/
+*.tar.xz
+*.tar.gz
+.last_known_release

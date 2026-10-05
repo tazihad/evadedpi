@@ -1,0 +1,9 @@
+services:
+  evadedpi:
+    image: tazihad/evadedpi:latest
+    container_name: evadedpi
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    # To run with a specific preset or custom flags, uncomment:
+    # command: ["--preset", "discord-youtube"]

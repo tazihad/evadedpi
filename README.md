@@ -2,6 +2,7 @@
 
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange?logo=rust)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docker Image](https://img.shields.io/docker/v/tazihad/evadedpi?label=docker&logo=docker)](https://hub.docker.com/r/tazihad/evadedpi)
 [![Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
 
 > **EvadeDPI** is a modern, high-performance Deep Packet Inspection (DPI) circumvention suite written in pure Rust. It combines the most effective packet manipulation, segmentation, decoy injection, and transport desynchronization techniques into a unified, cross-platform CLI tool.
@@ -207,7 +208,24 @@ Output:
 
 ---
 
-### 4. Verify & Use
+### 4. Run via Docker / Podman (Containerized)
+
+EvadeDPI is available on [Docker Hub](https://hub.docker.com/r/tazihad/evadedpi) as `tazihad/evadedpi` (and `ghcr.io/tazihad/evadedpi`):
+
+```bash
+# Run with default settings (port 9090):
+docker run -d --name evadedpi -p 9090:9090 --restart unless-stopped tazihad/evadedpi
+
+# Run with a specific circumvention preset:
+docker run -d --name evadedpi -p 9090:9090 --restart unless-stopped tazihad/evadedpi --preset discord-youtube
+
+# Or run with Docker Compose:
+docker compose up -d
+```
+
+---
+
+### 5. Verify & Use
 
 Once EvadeDPI is running:
 

@@ -84,11 +84,11 @@ pub enum Commands {
 #[derive(Args, Debug, Clone)]
 pub struct RunArgs {
     /// IP address to bind proxy server
-    #[arg(short, long, default_value = "127.0.0.1")]
+    #[arg(short, long, default_value = "127.0.0.1", env = "EVADEDPI_BIND")]
     pub bind: String,
 
     /// Port to listen on (serves both SOCKS5 and HTTP/HTTPS CONNECT)
-    #[arg(short, long, default_value_t = 9090)]
+    #[arg(short, long, default_value_t = 9090, env = "EVADEDPI_PORT")]
     pub port: u16,
 
     /// Automatically configure OS system proxy while running and restore on exit

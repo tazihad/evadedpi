@@ -115,7 +115,58 @@ To run EvadeDPI continuously in the background on Linux:
 
 ---
 
-## 4. System-Wide OS Settings
+## 4. Docker & Container Deployment
+
+EvadeDPI is distributed as an ultra-compact, non-root multi-architecture Docker image (`linux/amd64`, `linux/arm64`) on [Docker Hub](https://hub.docker.com/r/tazihad/evadedpi) and GitHub Container Registry (`ghcr.io/tazihad/evadedpi`).
+
+### Docker CLI
+```bash
+# Run standalone on port 9090
+docker run -d \
+  --name evadedpi \
+  -p 9090:9090 \
+  --restart unless-stopped \
+  tazihad/evadedpi
+
+# Run with a specific preset (e.g. discord-youtube)
+docker run -d \
+  --name evadedpi \
+  -p 9090:9090 \
+  --restart unless-stopped \
+  tazihad/evadedpi --preset discord-youtube
+```
+
+### Podman
+```bash
+podman run -d \
+  --name evadedpi \
+  -p 9090:9090 \
+  --restart unless-stopped \
+  tazihad/evadedpi
+```
+
+### Docker Compose
+Create a `docker-compose.yml`:
+```yaml
+services:
+  evadedpi:
+    image: tazihad/evadedpi:latest
+    container_name: evadedpi
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    # Optional command overrides:
+    # command: ["--preset", "general"]
+```
+
+Run:
+```bash
+docker compose up -d
+```
+
+---
+
+## 5. System-Wide OS Settings
 
 ### Linux (GNOME / KDE)
 - **GNOME**: Settings ➔ Network ➔ Network Proxy ➔ Manual
