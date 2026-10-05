@@ -52,11 +52,11 @@ Deep Packet Inspection (DPI) systems used by Internet Service Providers (ISPs) a
 ## ⚡ How EvadeDPI Works
 
 ### 1. Dual-Protocol Unified Proxy
-EvadeDPI listens on a single port (default `127.0.0.1:1080`). When a client connects, EvadeDPI peeks at the initial handshake bytes:
+EvadeDPI listens on a single port (default `127.0.0.1:9090`). When a client connects, EvadeDPI peeks at the initial handshake bytes:
 - If byte `0x05` is observed, it transparently negotiates **SOCKS5** (RFC 1928).
 - If ASCII HTTP verbs (`CONNECT`, `GET`, `POST`) are observed, it transparently handles **HTTP/HTTPS CONNECT Proxy** requests.
 
-Any browser, application, or CLI tool can point to `127.0.0.1:1080` regardless of whether it uses HTTP or SOCKS5!
+Any browser, application, or CLI tool can point to `127.0.0.1:9090` regardless of whether it uses HTTP or SOCKS5!
 
 ### 2. TLS ClientHello & SNI Segmentation
 When a client begins a TLS connection, it sends an unencrypted `ClientHello` containing the domain name inside the Server Name Indication (SNI) extension. 
@@ -187,7 +187,7 @@ Output:
    Written in Rust. Cross-Platform SOCKS5 & HTTP Proxy
 
 ╭─── Active Configuration ─────────────────────────────────────╮
-│ Listen Address:   http/socks5://127.0.0.1:1080               │
+│ Listen Address:   http/socks5://127.0.0.1:9090               │
 │ Active Profile:   general                                    │
 │ Split Strategy:   sni (delay: 2ms)                           │
 │ Mix SNI Casing:   Disabled                                   │
@@ -201,7 +201,7 @@ Output:
 
 [*Ready*] EvadeDPI is running. Configure your system or browser proxy to:
           Host: 127.0.0.1
-          Port: 1080
+          Port: 9090
           Type: HTTP or SOCKS5 (Both automatically supported)
 ```
 
@@ -216,11 +216,11 @@ Once EvadeDPI is running:
 ./evadedpi test youtube.com
 
 # 2. Test fetching a blocked site through the proxy with curl
-curl -x socks5h://127.0.0.1:1080 -I https://www.youtube.com
-curl -x http://127.0.0.1:1080 -I https://www.youtube.com
+curl -x socks5h://127.0.0.1:9090 -I https://www.youtube.com
+curl -x http://127.0.0.1:9090 -I https://www.youtube.com
 
 # 3. Launch Chrome/Chromium through the proxy
-google-chrome --proxy-server="socks5://127.0.0.1:1080"
+google-chrome --proxy-server="socks5://127.0.0.1:9090"
 ```
 
 ---
@@ -285,7 +285,7 @@ Example Output:
     evadedpi --preset first-byte --system-proxy
 
   Alternative run modes:
-    • Standalone proxy (configure browser or app manually to 127.0.0.1:1080):
+    • Standalone proxy (configure browser or app manually to 127.0.0.1:9090):
       evadedpi --preset first-byte
 
     • Apply circumvention ONLY to 'youtube.com' (other traffic direct):
@@ -327,7 +327,7 @@ Commands:
 
 Options:
   -b, --bind <BIND>              IP address to bind [default: 127.0.0.1]
-  -p, --port <PORT>              Port to listen on [default: 1080]
+  -p, --port <PORT>              Port to listen on [default: 9090]
   -S, --system-proxy             Set the OS system proxy while running; restored on exit
                                  (GNOME/gsettings, KDE Plasma, macOS, Windows)
       --preset <PRESET>          Evasion preset profile [default: general]
@@ -367,23 +367,23 @@ Options:
 ### Command Line (`curl` / `git` / `env`)
 ```bash
 # SOCKS5 Proxy
-export all_proxy="socks5h://127.0.0.1:1080"
+export all_proxy="socks5h://127.0.0.1:9090"
 curl -I https://www.google.com
 
 # HTTP Proxy
-export http_proxy="http://127.0.0.1:1080"
-export https_proxy="http://127.0.0.1:1080"
+export http_proxy="http://127.0.0.1:9090"
+export https_proxy="http://127.0.0.1:9090"
 curl -I https://www.google.com
 ```
 
 ### Web Browsers
 1. **Firefox**:
    - Settings ➔ Network Settings ➔ Manual proxy configuration
-   - **SOCKS Host**: `127.0.0.1`, Port: `1080`, SOCKS v5
+   - **SOCKS Host**: `127.0.0.1`, Port: `9090`, SOCKS v5
    - Check **"Proxy DNS when using SOCKS v5"**
 2. **Google Chrome / Chromium**:
    ```bash
-   google-chrome --proxy-server="socks5://127.0.0.1:1080"
+   google-chrome --proxy-server="socks5://127.0.0.1:9090"
    ```
 
 ---

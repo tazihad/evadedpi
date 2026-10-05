@@ -1,6 +1,6 @@
 # 🌐 Client Setup & System Configuration
 
-EvadeDPI acts as a local proxy server. Because it supports **both SOCKS5 and HTTP CONNECT proxy protocols simultaneously on the same port** (default `127.0.0.1:1080`), configuring applications is fast and simple.
+EvadeDPI acts as a local proxy server. Because it supports **both SOCKS5 and HTTP CONNECT proxy protocols simultaneously on the same port** (default `127.0.0.1:9090`), configuring applications is fast and simple.
 
 ---
 
@@ -13,7 +13,7 @@ Firefox has native, independent proxy configuration with remote DNS support:
 3. Select **Manual proxy configuration**.
 4. Set:
    - **SOCKS Host**: `127.0.0.1`
-   - **Port**: `1080`
+   - **Port**: `9090`
    - Select **SOCKS v5**
 5. Check **"Proxy DNS when using SOCKS v5"** (This ensures DNS queries are routed through EvadeDPI's DoH engine).
 6. Click **OK**.
@@ -23,15 +23,15 @@ Chromium-based browsers can be launched with proxy flags directly:
 
 ```bash
 # Launch with SOCKS5 proxy
-google-chrome --proxy-server="socks5://127.0.0.1:1080"
+google-chrome --proxy-server="socks5://127.0.0.1:9090"
 
 # Or with HTTP proxy
-google-chrome --proxy-server="http://127.0.0.1:1080"
+google-chrome --proxy-server="http://127.0.0.1:9090"
 ```
 
 Alternatively, use popular proxy switcher browser extensions such as **SwitchyOmega** or **FoxyProxy**:
 - Profile Type: SOCKS5 (or HTTP)
-- Server: `127.0.0.1`, Port: `1080`
+- Server: `127.0.0.1`, Port: `9090`
 
 ---
 
@@ -42,11 +42,11 @@ Set standard proxy environment variables in your current shell or `~/.bashrc` / 
 
 ```bash
 # SOCKS5 (with remote DNS resolution - notice socks5h://)
-export all_proxy="socks5h://127.0.0.1:1080"
+export all_proxy="socks5h://127.0.0.1:9090"
 
 # Standard HTTP/HTTPS
-export http_proxy="http://127.0.0.1:1080"
-export https_proxy="http://127.0.0.1:1080"
+export http_proxy="http://127.0.0.1:9090"
+export https_proxy="http://127.0.0.1:9090"
 ```
 
 To unset:
@@ -59,10 +59,10 @@ Configure Git to route HTTPS and SSH traffic through EvadeDPI:
 
 ```bash
 # Set HTTP/HTTPS proxy
-git config --global http.proxy "http://127.0.0.1:1080"
+git config --global http.proxy "http://127.0.0.1:9090"
 
 # Or SOCKS5 proxy
-git config --global http.proxy "socks5h://127.0.0.1:1080"
+git config --global http.proxy "socks5h://127.0.0.1:9090"
 
 # Unset when done
 git config --global --unset http.proxy
@@ -71,10 +71,10 @@ git config --global --unset http.proxy
 ### cURL
 ```bash
 # Using HTTP CONNECT proxy
-curl -x http://127.0.0.1:1080 -I https://www.google.com
+curl -x http://127.0.0.1:9090 -I https://www.google.com
 
 # Using SOCKS5 proxy with remote DNS
-curl -x socks5h://127.0.0.1:1080 -I https://www.google.com
+curl -x socks5h://127.0.0.1:9090 -I https://www.google.com
 ```
 
 ---
@@ -119,20 +119,20 @@ To run EvadeDPI continuously in the background on Linux:
 
 ### Linux (GNOME / KDE)
 - **GNOME**: Settings ➔ Network ➔ Network Proxy ➔ Manual
-  - Socks Host: `127.0.0.1`, Port: `1080`
+  - Socks Host: `127.0.0.1`, Port: `9090`
 - **KDE Plasma**: System Settings ➔ Network ➔ Proxy ➔ Manually specify the proxy settings
-  - SOCKS Proxy: `127.0.0.1`, Port: `1080`
+  - SOCKS Proxy: `127.0.0.1`, Port: `9090`
 
 ### macOS
 1. Open **System Settings** ➔ **Network**.
 2. Select your active connection (Wi-Fi or Ethernet) ➔ **Details...** ➔ **Proxies**.
 3. Toggle **SOCKS Proxy**:
-   - Server: `127.0.0.1`, Port: `1080`
+   - Server: `127.0.0.1`, Port: `9090`
 4. Click **OK** and **Apply**.
 
 ### Windows
 1. Open **Settings** ➔ **Network & internet** ➔ **Proxy**.
 2. Under **Manual proxy setup**, click **Set up**.
 3. Toggle **Use a proxy server** ON.
-4. Proxy IP address: `127.0.0.1`, Port: `1080`.
+4. Proxy IP address: `127.0.0.1`, Port: `9090`.
 5. Click **Save**.

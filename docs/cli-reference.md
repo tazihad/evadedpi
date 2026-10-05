@@ -94,7 +94,7 @@ evadedpi completions bash | sudo tee /etc/bash_completion.d/evadedpi > /dev/null
 | Flag | Short | Default | Description |
 | :--- | :---: | :---: | :--- |
 | `--bind <IP>` | `-b` | `127.0.0.1` | Local IP address to bind listener. Use `0.0.0.0` to share proxy across LAN. |
-| `--port <PORT>` | `-p` | `1080` | Port to listen on. Handles SOCKS5 and HTTP CONNECT simultaneously on this port. |
+| `--port <PORT>` | `-p` | `9090` | Port to listen on. Handles SOCKS5 and HTTP CONNECT simultaneously on this port. |
 | `--system-proxy` | `-S` | `false` | Automatically configures OS system proxy while EvadeDPI runs, restoring previous state on graceful exit. Alias: `--sysproxy`. |
 | `--idle-timeout <SECS>` | — | `120` | TCP tunnel idle reaper timeout in seconds. Cleans up abandoned or dead connections. |
 

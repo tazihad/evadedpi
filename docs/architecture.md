@@ -17,7 +17,7 @@ EvadeDPI is designed as a unified, high-performance desynchronization proxy writ
 ```mermaid
 graph TD
     Client["Client (Browser / App / CLI)"]
-    Listener["Unified Proxy Listener (port 1080)"]
+    Listener["Unified Proxy Listener (port 9090)"]
     ProtocolDetect{"Protocol Peek Byte 0"}
     SocksHandler["SOCKS5 Handler (RFC 1928)"]
     HttpHandler["HTTP CONNECT / Forward Handler"]
@@ -56,4 +56,4 @@ graph TD
 3. **Seamless Integration**:
    - Modern browsers and operating systems natively support HTTP and SOCKS5 proxies. Setting a proxy is non-destructive, does not interfere with routing tables, and works cleanly alongside WireGuard/VPNs.
 4. **Unified Single-Port Listener**:
-   - Rather than forcing users to remember whether they configured port 1080 for SOCKS5 or port 8080 for HTTP, EvadeDPI inspects the initial handshake byte and services both protocols on the exact same port.
+   - Rather than forcing users to remember whether they configured port 9090 for SOCKS5 or port 8080 for HTTP, EvadeDPI inspects the initial handshake byte and services both protocols on the exact same port.

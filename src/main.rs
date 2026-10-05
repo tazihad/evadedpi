@@ -137,7 +137,7 @@ async fn run_evadedpi(args: RunArgs) -> Result<()> {
     if args.bind != "127.0.0.1" || config.server.bind.is_empty() {
         config.server.bind = args.bind;
     }
-    if args.port != 1080 || config.server.port == 0 {
+    if args.port != 9090 || config.server.port == 0 {
         config.server.port = args.port;
     }
     if args.preset != "general" {

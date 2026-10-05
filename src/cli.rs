@@ -88,7 +88,7 @@ pub struct RunArgs {
     pub bind: String,
 
     /// Port to listen on (serves both SOCKS5 and HTTP/HTTPS CONNECT)
-    #[arg(short, long, default_value_t = 1080)]
+    #[arg(short, long, default_value_t = 9090)]
     pub port: u16,
 
     /// Automatically configure OS system proxy while running and restore on exit

@@ -69,7 +69,7 @@ evadedpi test blocked-site.com
 1. **DNS Leak in Browser**:
    Your browser may be resolving the domain through local system DNS before sending the connection to the proxy.
    - *Fix for Firefox*: Enable **"Proxy DNS when using SOCKS v5"** in Firefox Network Settings.
-   - *Fix for Chromium*: Launch with `--proxy-server="socks5://127.0.0.1:1080"` (SOCKS5 natively forwards hostnames for remote resolution).
+   - *Fix for Chromium*: Launch with `--proxy-server="socks5://127.0.0.1:9090"` (SOCKS5 natively forwards hostnames for remote resolution).
 2. **Browser Cached QUIC (HTTP/3)**:
    The browser may have previously established a QUIC connection that was cached.
    - *Fix*: Restart your browser or clear recent connection sockets (`chrome://net-internals/#sockets`).
@@ -81,7 +81,7 @@ evadedpi test blocked-site.com
 ---
 
 ### "Address already in use (os error 98)"
-Another service or previous proxy process is already using port 1080.
+Another service or previous proxy process is already using port 9090.
 - *Fix*: Bind to another port using `-p`:
   ```bash
   evadedpi -p 1088
@@ -106,12 +106,12 @@ If high latency occurs:
 
 Run cURL in verbose mode to verify handshake segmentation:
 ```bash
-curl -v -x socks5h://127.0.0.1:1080 -I https://www.google.com
+curl -v -x socks5h://127.0.0.1:9090 -I https://www.google.com
 ```
 
 Look for:
 ```text
-* Connected to 127.0.0.1 (127.0.0.1) port 1080
+* Connected to 127.0.0.1 (127.0.0.1) port 9090
 * TLSv1.3 (OUT), TLS handshake, Client hello (1):
 * TLSv1.3 (IN), TLS handshake, Server hello (2):
 ...

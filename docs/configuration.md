@@ -25,7 +25,7 @@ bind = "127.0.0.1"
 
 # Port to listen on.
 # Handles both SOCKS5 and HTTP CONNECT proxy protocols simultaneously.
-port = 1080
+port = 9090
 
 # TCP tunnel idle reaper timeout in seconds. Automatically closes dead/hanging tunnels.
 idle_timeout_secs = 120

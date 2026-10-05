@@ -83,7 +83,7 @@ fn default_bind() -> String {
     "127.0.0.1".to_string()
 }
 fn default_port() -> u16 {
-    1080
+    9090
 }
 fn default_idle_timeout() -> u64 {
     120
@@ -416,7 +416,7 @@ impl AppConfig {
 # IP address to listen on ("127.0.0.1" for local, "0.0.0.0" for LAN access)
 bind = "127.0.0.1"
 # Port for the unified SOCKS5 and HTTP/HTTPS proxy listener
-port = 1080
+port = 9090
 # Connection idle timeout in seconds (reaps dead/abandoned tunnels)
 idle_timeout_secs = 120
 # Automatically configure OS system proxy while running and restore on exit
