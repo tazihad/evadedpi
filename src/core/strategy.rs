@@ -1,5 +1,33 @@
-// EvadeDPI: Modern Deep Packet Inspection Circumvention Engine
-// Desynchronization Strategy Definitions and Segment Planning
+// -----------------------------------------------------------------------------
+// File Name:      src/core/strategy.rs
+// Description:    Desynchronization strategy definitions and segment planning.
+// Author:         @tazihad
+// Website:        https://zihad.com.bd
+// License:        MIT License
+// -----------------------------------------------------------------------------
+
+// MIT License
+//
+// Copyright (c) 2024-2026 @tazihad
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+// -----------------------------------------------------------------------------
 
 use std::fmt;
 use std::time::Duration;
@@ -11,7 +39,7 @@ use tracing::{debug, trace};
 use super::fake::generate_fake_client_hello;
 use super::http::{is_http_request, mutate_http_request, parse_http_request, HttpEvasionOptions};
 use super::socket::{send_oob_byte, set_socket_ttl};
-use super::tls::{is_client_hello, parse_client_hello, split_into_tls_records};
+use super::tls::{is_client_hello, mutate_sni_casing, parse_client_hello, split_into_tls_records};
 
 /// Strategy used for segmenting TLS ClientHello and HTTP requests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -19,6 +47,10 @@ pub enum SplitMode {
     /// Split payload right at the Server Name Indication (SNI) extension boundary.
     #[default]
     Sni,
+    /// Split payload right in the middle of the SNI domain name.
+    MidSni,
+    /// Multi-split: split before SNI, inside SNI, and after SNI.
+    MultiSplit,
     /// Split the first byte into a separate packet (1 + remainder).
     FirstByte,
     /// Split payload into fixed-size chunks.
@@ -35,6 +67,8 @@ impl fmt::Display for SplitMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SplitMode::Sni => write!(f, "sni"),
+            SplitMode::MidSni => write!(f, "mid-sni"),
+            SplitMode::MultiSplit => write!(f, "multisplit"),
             SplitMode::FirstByte => write!(f, "first-byte"),
             SplitMode::Chunk => write!(f, "chunk"),
             SplitMode::Random => write!(f, "random"),
@@ -71,6 +105,8 @@ pub struct EvasionStrategy {
     pub http_evasion: HttpEvasionOptions,
     /// Block QUIC (UDP 443) to force browser TCP fallback.
     pub block_quic: bool,
+    /// Randomize SNI domain name letter casing (RFC 6066 case-insensitive).
+    pub mix_sni: bool,
 }
 
 impl Default for EvasionStrategy {
@@ -93,6 +129,7 @@ impl Default for EvasionStrategy {
                 newline_before_host: false,
             },
             block_quic: true,
+            mix_sni: false,
         }
     }
 }
@@ -148,22 +185,32 @@ impl EvasionStrategy {
             let _ = set_socket_ttl(upstream, 64);
         }
 
-        // 3. Process Payload & Determine Chunks
+        // 3. Process Payload & Apply SNI mutations if configured
+        let mut processed_payload = initial_data.to_vec();
+        if self.mix_sni && is_tls {
+            if let Some(info) = parse_client_hello(&processed_payload) {
+                if info.sni_offset_start < info.sni_offset_end {
+                    mutate_sni_casing(&mut processed_payload, info.sni_offset_start, info.sni_offset_end);
+                }
+            }
+        }
+
+        // 4. Process Payload & Determine Chunks
         let chunks = if is_tls {
-            self.plan_tls_segments(initial_data)
+            self.plan_tls_segments(&processed_payload)
         } else if is_http {
-            self.plan_http_segments(initial_data)
+            self.plan_http_segments(&processed_payload)
         } else {
             // Raw passthrough for unknown protocols
             vec![SegmentChunk {
-                data: initial_data.to_vec(),
+                data: processed_payload,
                 delay_after: Duration::ZERO,
                 is_fake: false,
                 custom_ttl: None,
             }]
         };
 
-        // 4. Transmit Chunks with Inter-segment Delays
+        // 5. Transmit Chunks with Inter-segment Delays
         let total_chunks = chunks.len();
         debug!(
             "Transmitting {} segment(s) (TLS: {}, HTTP: {}, Disorder: {})",
@@ -269,6 +316,64 @@ impl EvasionStrategy {
                     }
                 }
                 // Fallback to first-byte split if SNI offset not found
+                self.split_first_byte(buffer, delay)
+            }
+            SplitMode::MidSni => {
+                if let Some(info) = parse_client_hello(buffer) {
+                    if info.sni_offset_start > 0 && info.sni_offset_end > info.sni_offset_start {
+                        let mid = info.sni_offset_start + (info.sni_offset_end - info.sni_offset_start) / 2;
+                        debug!(
+                            "Splitting TLS ClientHello in middle of SNI (offset {}) for SNI {:?}",
+                            mid, info.sni
+                        );
+                        return vec![
+                            SegmentChunk {
+                                data: buffer[..mid].to_vec(),
+                                delay_after: delay,
+                                is_fake: false,
+                                custom_ttl: None,
+                            },
+                            SegmentChunk {
+                                data: buffer[mid..].to_vec(),
+                                delay_after: Duration::ZERO,
+                                is_fake: false,
+                                custom_ttl: None,
+                            },
+                        ];
+                    }
+                }
+                self.split_first_byte(buffer, delay)
+            }
+            SplitMode::MultiSplit => {
+                if let Some(info) = parse_client_hello(buffer) {
+                    if info.sni_offset_start > 0 && info.sni_offset_end > info.sni_offset_start {
+                        let mid = info.sni_offset_start + (info.sni_offset_end - info.sni_offset_start) / 2;
+                        debug!(
+                            "Multi-splitting TLS ClientHello at offsets {} and {} for SNI {:?}",
+                            info.sni_offset_start, mid, info.sni
+                        );
+                        return vec![
+                            SegmentChunk {
+                                data: buffer[..info.sni_offset_start].to_vec(),
+                                delay_after: delay,
+                                is_fake: false,
+                                custom_ttl: None,
+                            },
+                            SegmentChunk {
+                                data: buffer[info.sni_offset_start..mid].to_vec(),
+                                delay_after: delay,
+                                is_fake: false,
+                                custom_ttl: None,
+                            },
+                            SegmentChunk {
+                                data: buffer[mid..].to_vec(),
+                                delay_after: Duration::ZERO,
+                                is_fake: false,
+                                custom_ttl: None,
+                            },
+                        ];
+                    }
+                }
                 self.split_first_byte(buffer, delay)
             }
             SplitMode::FirstByte => self.split_first_byte(buffer, delay),
@@ -422,5 +527,39 @@ impl EvasionStrategy {
                 custom_ttl: None,
             }]
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::tls::tests::create_test_client_hello;
+
+    #[test]
+    fn test_mid_sni_split() {
+        let pkt = create_test_client_hello("example.com");
+        let strat = EvasionStrategy {
+            split_mode: SplitMode::MidSni,
+            delay_ms: 2,
+            ..Default::default()
+        };
+        let segments = strat.plan_tls_segments(&pkt);
+        assert_eq!(segments.len(), 2);
+        let reconstructed: Vec<u8> = segments.iter().flat_map(|s| s.data.clone()).collect();
+        assert_eq!(reconstructed, pkt);
+    }
+
+    #[test]
+    fn test_multi_split() {
+        let pkt = create_test_client_hello("example.com");
+        let strat = EvasionStrategy {
+            split_mode: SplitMode::MultiSplit,
+            delay_ms: 2,
+            ..Default::default()
+        };
+        let segments = strat.plan_tls_segments(&pkt);
+        assert_eq!(segments.len(), 3);
+        let reconstructed: Vec<u8> = segments.iter().flat_map(|s| s.data.clone()).collect();
+        assert_eq!(reconstructed, pkt);
     }
 }

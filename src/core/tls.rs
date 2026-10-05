@@ -1,5 +1,33 @@
-// EvadeDPI: Modern Deep Packet Inspection Circumvention Engine
-// Core TLS Inspection, SNI Extraction, and Record Layer Manipulation
+// -----------------------------------------------------------------------------
+// File Name:      src/core/tls.rs
+// Description:    TLS ClientHello inspection, SNI extraction, and record fragmentation.
+// Author:         @tazihad
+// Website:        https://zihad.com.bd
+// License:        MIT License
+// -----------------------------------------------------------------------------
+
+// MIT License
+//
+// Copyright (c) 2024-2026 @tazihad
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+// -----------------------------------------------------------------------------
 
 use tracing::trace;
 
@@ -227,6 +255,23 @@ pub fn is_client_hello(buffer: &[u8]) -> bool {
     parse_client_hello(buffer).is_some()
 }
 
+/// Mutates the SNI hostname inside the buffer by randomizing letter casing (e.g. `youtube.com` -> `yOuTuBe.cOm`).
+/// RFC 6066 states SNI hostnames are ASCII case-insensitive, but DPI filters often use case-sensitive string matching.
+pub fn mutate_sni_casing(buffer: &mut [u8], start: usize, end: usize) {
+    if start >= end || end > buffer.len() {
+        return;
+    }
+    for (i, b) in buffer[start..end].iter_mut().enumerate() {
+        if b.is_ascii_alphabetic() {
+            if (i % 2 == 0) ^ (rand::random::<bool>()) {
+                *b = b.to_ascii_uppercase();
+            } else {
+                *b = b.to_ascii_lowercase();
+            }
+        }
+    }
+}
+
 /// Splits a TLS ClientHello packet into multiple TLS records (`--tlsrec`).
 ///
 /// Under RFC 5246 (TLS 1.2) and RFC 8446 (TLS 1.3), a handshake message
@@ -272,11 +317,11 @@ pub fn split_into_tls_records(buffer: &[u8], split_pos: usize) -> Option<(Vec<u8
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     // A minimal valid TLS ClientHello with SNI "example.com"
-    fn create_test_client_hello(hostname: &str) -> Vec<u8> {
+    pub(crate) fn create_test_client_hello(hostname: &str) -> Vec<u8> {
         let host_bytes = hostname.as_bytes();
         let sni_ext_len = 2 + 1 + 2 + host_bytes.len(); // list_len + type + host_len + host
         let _ext_len = 2 + 2 + sni_ext_len; // ext_type + ext_len + sni_ext
@@ -339,5 +384,18 @@ mod tests {
         assert_eq!(rec2[0], 0x16);
         // Combined length of payload equals original payload + 5 bytes overhead for 2nd header
         assert_eq!(rec1.len() + rec2.len(), pkt.len() + 5);
+    }
+
+    #[test]
+    fn test_mutate_sni_casing() {
+        let mut pkt = create_test_client_hello("youtube.com");
+        let info = parse_client_hello(&pkt).unwrap();
+        mutate_sni_casing(&mut pkt, info.sni_offset_start, info.sni_offset_end);
+        let mutated_sni = &pkt[info.sni_offset_start..info.sni_offset_end];
+        // Must still match case-insensitively
+        assert_eq!(
+            std::str::from_utf8(mutated_sni).unwrap().to_ascii_lowercase(),
+            "youtube.com"
+        );
     }
 }
