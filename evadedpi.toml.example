@@ -1,0 +1,68 @@
+# EvadeDPI Configuration File (evadedpi.toml)
+# Complete DPI Circumvention Suite
+
+[server]
+# IP address to listen on ("127.0.0.1" for local, "0.0.0.0" for LAN access)
+bind = "127.0.0.1"
+# Port for the unified SOCKS5 and HTTP/HTTPS proxy listener
+port = 1080
+
+[evasion]
+# Pre-configured profile: "general", "first-byte", "russia", "iran", "china", "turkey", "extreme"
+preset = "general"
+
+# Splitting mode: "sni", "first-byte", "chunk", "random", "custom", "none"
+split_mode = "sni"
+
+# Chunk size in bytes when split_mode = "chunk"
+chunk_size = 40
+
+# Custom byte split offsets when split_mode = "custom" (e.g. [1, 5, 20])
+custom_offsets = []
+
+# Delay between sending TCP segments in milliseconds (prevents packet coalescing)
+delay_ms = 2
+
+# Reverse transmission order of segments (disorder)
+disorder = false
+
+# Fragment TLS ClientHello across multiple TLS record layers (RFC compliant)
+tls_record_split = false
+
+# Inject decoy packet with low TTL before real packet
+enable_fake = false
+fake_sni = "www.microsoft.com"
+fake_ttl = 4
+
+# Send 1 byte of Out-Of-Band (TCP Urgent) data
+enable_oob = false
+
+# Block QUIC (UDP port 443) so browsers fallback to TCP HTTPS
+block_quic = true
+
+# HTTP evasion mutations
+mix_host = true
+host_space_trim = true
+extra_method_space = false
+newline_before_host = false
+
+[dns]
+# Enable DNS-over-HTTPS to prevent ISP DNS hijacking/poisoning
+enable_doh = true
+
+# DoH provider: "cloudflare", "google", "quad9", "adguard", or full https URL
+doh_provider = "cloudflare"
+
+# Prefer IPv4 addresses over IPv6
+prefer_ipv4 = true
+
+[rules]
+# Path to a text file containing domain rules (one per line)
+# rules_file = "/etc/evadedpi/domains.txt"
+
+# Rule scope: "all", "allowlist" (only listed), "blocklist" (exclude listed)
+scope = "all"
+
+[ui]
+# Periodic status reporting interval in seconds (optional)
+# stats_interval = 30
