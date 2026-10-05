@@ -148,25 +148,76 @@ To bypass DNS poisoning and tampering by local ISPs, EvadeDPI resolves all targe
 
 ## 🚀 Quick Start
 
-### Build from Source
+### 1. Download Pre-Built Release (Recommended)
+
+Pre-compiled, standalone binaries are packaged with high-efficiency `.tar.xz` compression and hosted on the [GitHub Releases](https://github.com/tazihad/evadedpi/releases) page. No dependencies, runtimes, or kernel drivers are required.
+
+#### Option A: One-Liner Download & Extract (Linux x86_64)
 
 ```bash
-# Clone and enter directory
+# Download the latest v0.2.0 release archive
+curl -sLO https://github.com/tazihad/evadedpi/releases/download/v0.2.0/evadedpi-v0.2.0-linux-x86_64.tar.xz
+
+# Extract the archive
+tar -xJf evadedpi-v0.2.0-linux-x86_64.tar.xz
+
+# (Optional) Install system-wide to /usr/local/bin
+sudo install -m 755 evadedpi /usr/local/bin/
+```
+
+#### Option B: Dynamic Latest Release Fetch via `curl`
+
+```bash
+# Dynamically queries GitHub API for the latest .tar.xz asset
+curl -s https://api.github.com/repos/tazihad/evadedpi/releases/latest \
+  | grep "browser_download_url.*linux-x86_64.tar.xz" \
+  | cut -d : -f 2,3 \
+  | tr -d \" \
+  | xargs curl -LO
+
+# Extract the downloaded archive
+tar -xJf evadedpi-*-linux-x86_64.tar.xz
+```
+
+#### Option C: GitHub CLI (`gh`)
+
+```bash
+gh release download -R tazihad/evadedpi --pattern "*.tar.xz"
+tar -xJf evadedpi-*-linux-x86_64.tar.xz
+```
+
+---
+
+### 2. Build from Source (Cargo)
+
+If you have Rust (1.75+) installed and prefer compiling directly:
+
+```bash
+# Clone the repository
+git clone https://github.com/tazihad/evadedpi.git
 cd evadedpi
 
-# Build release binary
+# Build optimized release binary
 cargo build --release
 
 # The compiled binary is located at target/release/evadedpi
 ./target/release/evadedpi --help
 ```
 
-### Run EvadeDPI
+---
+
+### 3. Run EvadeDPI
 
 Start the proxy server with default recommended settings:
+
 ```bash
-./target/release/evadedpi
+# If installed system-wide:
+evadedpi
+
+# Or if running from extracted archive / source directory:
+./evadedpi
 ```
+
 Output:
 ```text
   ______               _      _____  _____ _____ 
@@ -176,13 +227,14 @@ Output:
  | |____\ V / (_| | (_| |  __/ |__| | |    _| |_ 
  |______|\_/ \__,_|\__,_|\___|_____/|_|   |_____|
 
-   EvadeDPI v0.1.0 - Deep Packet Inspection Evasion Suite
+   EvadeDPI v0.2.0 - Deep Packet Inspection Evasion Suite
    Written in Rust. Cross-Platform SOCKS5 & HTTP Proxy
 
 ╭─── Active Configuration ─────────────────────────────────────╮
 │ Listen Address:   http/socks5://127.0.0.1:1080               │
 │ Active Profile:   general                                    │
 │ Split Strategy:   sni (delay: 2ms)                           │
+│ Mix SNI Casing:   Disabled                                   │
 │ Fake Decoy SNI:   Disabled                                   │
 │ TLS Record Split: Disabled                                   │
 │ Disorder Delivery Disabled                                   │
@@ -195,6 +247,24 @@ Output:
           Host: 127.0.0.1
           Port: 1080
           Type: HTTP or SOCKS5 (Both automatically supported)
+```
+
+---
+
+### 4. Verify & Use
+
+Once EvadeDPI is running:
+
+```bash
+# 1. Run a censorship diagnostic test against a domain
+./evadedpi test youtube.com
+
+# 2. Test fetching a blocked site through the proxy with curl
+curl -x socks5h://127.0.0.1:1080 -I https://www.youtube.com
+curl -x http://127.0.0.1:1080 -I https://www.youtube.com
+
+# 3. Launch Chrome/Chromium through the proxy
+google-chrome --proxy-server="socks5://127.0.0.1:1080"
 ```
 
 ---
